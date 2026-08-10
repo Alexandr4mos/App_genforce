@@ -1,0 +1,32 @@
+# dependencies
+node_modules/
+
+# Expo / React Native
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# env / secrets
+.env
+.env*.local
+*.pem
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# native / build
+.kotlin/
+/ios
+/android
+*.orig.*
+
+# debug / OS
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+.metro-health-check*
+*.tsbuildinfo
