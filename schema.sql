@@ -103,8 +103,8 @@ create table ordens_servico (
   numero serial unique,                 -- número sequencial tipo #9735
   cliente_id uuid references clientes(id),
   unidade_id uuid references unidades(id),
-  tipo text not null,                   -- 'preventiva' | 'corretiva' | 'visita_tecnica'
-  status text not null default 'pendente', -- pendente|andamento|pausada|concluida
+  tipo text,                            -- OBSOLETO desde a migração 01 — ver tabela os_tipos abaixo. Mantido só por segurança (dados antigos), não é mais lido pelo app.
+  status text not null default 'pendente', -- pendente|andamento|pausada|concluida|agendado
   descricao text,
   data_inicio_prevista timestamptz,
   data_fim_prevista timestamptz,
@@ -118,6 +118,17 @@ create table ordens_servico (
   km_retorno numeric,
   observacoes_gerais text,
   criado_em timestamptz default now()
+);
+
+-- Tipos/modalidades de uma OS (N:N — uma OS pode ter mais de um tipo,
+-- ex: "Teste com Carga Programado" + "Manutenção Preventiva" juntos).
+-- Adicionada na migração 01 (18/08/2026), substitui a coluna ordens_servico.tipo.
+-- Valores usados pelo app: 'atendimento_emergencia' | 'manutencao_corretiva' |
+-- 'visita_tecnica' | 'teste_carga_programado' | 'manutencao_preventiva'
+create table os_tipos (
+  os_id uuid references ordens_servico(id) on delete cascade,
+  tipo text not null,
+  primary key (os_id, tipo)
 );
 
 -- Técnicos alocados numa OS (N:N)
@@ -229,6 +240,7 @@ create table assinaturas (
 -- =========================================================
 create index idx_os_status on ordens_servico(status);
 create index idx_os_cliente on ordens_servico(cliente_id);
+create index idx_os_tipos_os on os_tipos(os_id);
 create index idx_pendencias_status on pendencias(status);
 create index idx_pendencias_equipamento on pendencias(equipamento_id);
 create index idx_relatorio_pecas_os on relatorio_pecas(os_id);

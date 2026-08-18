@@ -74,8 +74,8 @@ export default function OSDetail({ osId, userId, onBack }) {
     loadData();
   }, [osId]);
 
-  async function loadData() {
-    setLoading(true);
+  async function loadData(mostrarLoading = true) {
+    if (mostrarLoading) setLoading(true);
 
     const { data: osEq, error: osEqError } = await supabase
       .from('os_equipamentos')
@@ -85,7 +85,7 @@ export default function OSDetail({ osId, userId, onBack }) {
     if (osEqError) {
       console.log(osEqError);
       setLoading(false);
-      return;
+      return null;
     }
 
     const withItens = await Promise.all(
@@ -183,6 +183,13 @@ export default function OSDetail({ osId, userId, onBack }) {
     setFotosPorPendencia(fotosPendenciaIniciais);
 
     setLoading(false);
+
+    return { osEquipamentos: withItens, respostas: respostasIniciais };
+  }
+
+  async function atualizarDados() {
+    await loadData(false);
+    avisar('Dados atualizados com o que os outros técnicos já preencheram.', 'Sincronizado');
   }
 
   function pegarLocalizacao() {
@@ -244,6 +251,29 @@ export default function OSDetail({ osId, userId, onBack }) {
       avisar(
         'Preencha todo o checklist e clique em "💾 Salvar Relatório" antes de fazer o check-out.',
         'Relatório não salvo'
+      );
+      return;
+    }
+
+    // Busca o estado mais atual do servidor — importante quando mais de um
+    // técnico preenche geradores diferentes da mesma OS ao mesmo tempo.
+    const dadosFrescos = await loadData(false);
+    if (!dadosFrescos) return;
+
+    const faltando = [];
+    dadosFrescos.osEquipamentos.forEach((eq) => {
+      eq.itens.forEach((item) => {
+        if (!dadosFrescos.respostas[chave(eq.id, item.id)]) {
+          faltando.push(`${eq.equipamentos?.tag || 'Gerador'}: ${item.titulo}`);
+        }
+      });
+    });
+
+    if (faltando.length > 0) {
+      setRelatorioSalvo(false);
+      avisar(
+        `Outro técnico pode ter deixado itens pendentes em outro gerador. Faltam ${faltando.length} item(ns): ${faltando.slice(0, 3).join(' · ')}`,
+        'Relatório incompleto'
       );
       return;
     }
@@ -717,6 +747,10 @@ export default function OSDetail({ osId, userId, onBack }) {
 
       <Text style={styles.title}>Detalhe da OS</Text>
 
+      <TouchableOpacity style={styles.atualizarBotao} onPress={atualizarDados}>
+        <Text style={styles.atualizarBotaoTexto}>🔄 Atualizar (ver o que outros técnicos já preencheram)</Text>
+      </TouchableOpacity>
+
       <View style={styles.checkinSection}>
         {!osInfo?.checkin_em ? (
           <TouchableOpacity
@@ -1065,6 +1099,15 @@ const styles = StyleSheet.create({
   backButton: { marginBottom: 10 },
   backText: { color: '#007AFF', fontSize: 16 },
   title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20 },
+  atualizarBotao: {
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  atualizarBotaoTexto: { color: '#007AFF', fontWeight: '600', fontSize: 13 },
   equipamentoBlock: { marginBottom: 24 },
   equipamentoTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12 },
   itemBlock: { borderWidth: 1, borderColor: '#eee', borderRadius: 8, padding: 12, marginBottom: 12 },

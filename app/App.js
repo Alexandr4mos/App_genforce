@@ -15,6 +15,7 @@ import { supabase } from './lib/supabase';
 import OSDetail from './screens/OSDetail';
 import NovaOS from './screens/NovaOS';
 import EditarOS from './screens/EditarOS';
+import { rotuloTipo, corDoStatus } from './lib/constantes';
 
 function avisar(mensagem, titulo = 'Aviso') {
   if (Platform.OS === 'web') {
@@ -65,7 +66,7 @@ export default function App() {
     setErrorMsg('');
     const { data, error } = await supabase
       .from('ordens_servico')
-      .select('id, numero, tipo, status, descricao, checkin_em, checkout_em, clientes(nome)')
+      .select('id, numero, status, descricao, checkin_em, checkout_em, clientes(nome), os_tipos(tipo)')
       .order('criado_em', { ascending: false });
 
     if (error) setErrorMsg(error.message);
@@ -108,6 +109,7 @@ export default function App() {
   }
 
   function corDoCard(item) {
+    if (item.status === 'agendado') return corDoStatus('agendado'); // azul
     if (item.checkout_em) return '#4caf50'; // verde: concluída
     if (item.checkin_em) return '#ffb300'; // amarelo: em andamento
     return '#e53935'; // vermelho: não iniciada
@@ -198,6 +200,10 @@ export default function App() {
           <View style={[styles.legendaBolinha, { backgroundColor: '#4caf50' }]} />
           <Text style={styles.legendaTexto}>Concluída</Text>
         </View>
+        <View style={styles.legendaItem}>
+          <View style={[styles.legendaBolinha, { backgroundColor: corDoStatus('agendado') }]} />
+          <Text style={styles.legendaTexto}>Agendado</Text>
+        </View>
       </View>
 
       <FlatList
@@ -221,7 +227,7 @@ export default function App() {
 
             <TouchableOpacity onPress={() => setOsSelecionadaId(item.id)}>
               <Text style={styles.cardCliente}>{item.clientes?.nome}</Text>
-              <Text>{item.tipo}</Text>
+              <Text>{(item.os_tipos || []).map((t) => rotuloTipo(t.tipo)).join(', ')}</Text>
               <Text>{item.descricao}</Text>
             </TouchableOpacity>
 

@@ -11,9 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
-
-// Template padrão usado até existir uma tela de escolha de checklist
-const TEMPLATE_PADRAO_ID = '55555555-5555-5555-5555-555555555555';
+import { TIPOS_OS, TEMPLATE_PADRAO_ID } from '../lib/constantes';
 
 function avisar(mensagem, titulo = 'Aviso') {
   if (Platform.OS === 'web') {
@@ -41,7 +39,8 @@ export default function NovaOS({ onBack, onCriada }) {
   const [novoPlacaAlternador, setNovoPlacaAlternador] = useState('');
   const [salvandoEquipamento, setSalvandoEquipamento] = useState(false);
 
-  const [tipo, setTipo] = useState('preventiva');
+  const [tiposSelecionados, setTiposSelecionados] = useState({});
+  const [dataPrevista, setDataPrevista] = useState('');
   const [descricao, setDescricao] = useState('');
   const [salvando, setSalvando] = useState(false);
 
@@ -51,13 +50,14 @@ export default function NovaOS({ onBack, onCriada }) {
 
   const [mostrarNovaUnidade, setMostrarNovaUnidade] = useState(false);
   const [novaUnidadeNome, setNovaUnidadeNome] = useState('');
+  const [novaUnidadeEndereco, setNovaUnidadeEndereco] = useState('');
   const [salvandoUnidade, setSalvandoUnidade] = useState(false);
 
-  const TIPOS_OS = [
-    { valor: 'preventiva', rotulo: 'Preventiva' },
-    { valor: 'corretiva', rotulo: 'Corretiva' },
-    { valor: 'visita_tecnica', rotulo: 'Visita Técnica' },
-  ];
+  const [unidadeSelecionadaInfo, setUnidadeSelecionadaInfo] = useState(null);
+
+  function alternarTipo(valor) {
+    setTiposSelecionados((prev) => ({ ...prev, [valor]: !prev[valor] }));
+  }
 
   useEffect(() => {
     carregarClientes();
@@ -87,11 +87,12 @@ export default function NovaOS({ onBack, onCriada }) {
   async function carregarUnidades(idCliente) {
     const { data } = await supabase
       .from('unidades')
-      .select('id, nome')
+      .select('id, nome, endereco')
       .eq('cliente_id', idCliente)
       .order('nome');
     setUnidades(data || []);
     setUnidadeId(null);
+    setUnidadeSelecionadaInfo(null);
   }
 
   async function carregarEquipamentos(idUnidade) {
@@ -143,8 +144,8 @@ export default function NovaOS({ onBack, onCriada }) {
     setSalvandoUnidade(true);
     const { data, error } = await supabase
       .from('unidades')
-      .insert({ cliente_id: clienteId, nome: novaUnidadeNome.trim() })
-      .select('id, nome')
+      .insert({ cliente_id: clienteId, nome: novaUnidadeNome.trim(), endereco: novaUnidadeEndereco.trim() || null })
+      .select('id, nome, endereco')
       .single();
     setSalvandoUnidade(false);
 
@@ -156,7 +157,9 @@ export default function NovaOS({ onBack, onCriada }) {
 
     setUnidades((prev) => [...prev, data].sort((a, b) => a.nome.localeCompare(b.nome)));
     setUnidadeId(data.id);
+    setUnidadeSelecionadaInfo(data);
     setNovaUnidadeNome('');
+    setNovaUnidadeEndereco('');
     setMostrarNovaUnidade(false);
   }
 
@@ -215,16 +218,30 @@ export default function NovaOS({ onBack, onCriada }) {
       avisar('Marque ao menos um gerador para esta OS.', 'Falta informação');
       return;
     }
+    const tiposEscolhidos = Object.keys(tiposSelecionados).filter((valor) => tiposSelecionados[valor]);
+    if (tiposEscolhidos.length === 0) {
+      avisar('Marque ao menos um tipo de OS.', 'Falta informação');
+      return;
+    }
 
     setSalvando(true);
+
+    let dataConvertida = null;
+    if (dataPrevista.trim()) {
+      const partes = dataPrevista.trim().split('/');
+      if (partes.length === 3) {
+        const [dia, mes, ano] = partes;
+        dataConvertida = `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+      }
+    }
 
     const { data: novaOs, error: osError } = await supabase
       .from('ordens_servico')
       .insert({
         cliente_id: clienteId,
         unidade_id: unidadeId,
-        tipo,
-        status: 'andamento',
+        status: 'pendente',
+        data_inicio_prevista: dataConvertida,
         descricao: descricao.trim() || null,
       })
       .select('id')
@@ -247,11 +264,25 @@ export default function NovaOS({ onBack, onCriada }) {
       .from('os_equipamentos')
       .insert(linhasOsEquipamentos);
 
-    setSalvando(false);
-
     if (vinculoError) {
       console.log(vinculoError);
+      setSalvando(false);
       avisar(vinculoError.message || 'Tente novamente.', 'Erro ao vincular geradores');
+      return;
+    }
+
+    const linhasOsTipos = tiposEscolhidos.map((valorTipo) => ({
+      os_id: novaOs.id,
+      tipo: valorTipo,
+    }));
+
+    const { error: tiposError } = await supabase.from('os_tipos').insert(linhasOsTipos);
+
+    setSalvando(false);
+
+    if (tiposError) {
+      console.log(tiposError);
+      avisar(tiposError.message || 'Tente novamente.', 'Erro ao salvar tipo da OS');
       return;
     }
 
@@ -310,7 +341,10 @@ export default function NovaOS({ onBack, onCriada }) {
               <TouchableOpacity
                 key={u.id}
                 style={[styles.itemLista, unidadeId === u.id && styles.itemListaSelecionado]}
-                onPress={() => setUnidadeId(u.id)}
+                onPress={() => {
+                  setUnidadeId(u.id);
+                  setUnidadeSelecionadaInfo(u);
+                }}
               >
                 <Text style={unidadeId === u.id ? styles.itemListaTextoSelecionado : styles.itemListaTexto}>
                   {u.nome}
@@ -322,6 +356,10 @@ export default function NovaOS({ onBack, onCriada }) {
             ) : null}
           </View>
 
+          {unidadeSelecionadaInfo?.endereco ? (
+            <Text style={styles.enderecoTexto}>📍 {unidadeSelecionadaInfo.endereco}</Text>
+          ) : null}
+
           {mostrarNovaUnidade ? (
             <View style={styles.novoEquipamentoForm}>
               <TextInput
@@ -329,6 +367,12 @@ export default function NovaOS({ onBack, onCriada }) {
                 placeholder="Nome da unidade (ex: Sede, Filial Norte) *"
                 value={novaUnidadeNome}
                 onChangeText={setNovaUnidadeNome}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Endereço / localização"
+                value={novaUnidadeEndereco}
+                onChangeText={setNovaUnidadeEndereco}
               />
               <Button
                 title={salvandoUnidade ? 'Salvando...' : 'Salvar unidade'}
@@ -420,20 +464,29 @@ export default function NovaOS({ onBack, onCriada }) {
             </TouchableOpacity>
           )}
 
-          <Text style={styles.label}>Tipo de OS</Text>
+          <Text style={styles.label}>Tipo de OS (marque um ou mais)</Text>
           <View style={styles.tipoRow}>
             {TIPOS_OS.map((t) => (
               <TouchableOpacity
                 key={t.valor}
-                style={[styles.tipoButton, tipo === t.valor && styles.tipoButtonSelecionado]}
-                onPress={() => setTipo(t.valor)}
+                style={[styles.tipoButton, tiposSelecionados[t.valor] && styles.tipoButtonSelecionado]}
+                onPress={() => alternarTipo(t.valor)}
               >
-                <Text style={tipo === t.valor ? styles.tipoTextoSelecionado : styles.tipoTexto}>
+                <Text style={tiposSelecionados[t.valor] ? styles.tipoTextoSelecionado : styles.tipoTexto}>
+                  {tiposSelecionados[t.valor] ? '✓ ' : ''}
                   {t.rotulo}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
+
+          <Text style={styles.label}>Data prevista da manutenção</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="DD/MM/AAAA"
+            value={dataPrevista}
+            onChangeText={setDataPrevista}
+          />
 
           <Text style={styles.label}>Descrição</Text>
           <TextInput
@@ -468,6 +521,7 @@ const styles = StyleSheet.create({
   itemListaTexto: { color: '#333' },
   itemListaTextoSelecionado: { color: '#fff', fontWeight: 'bold' },
   avisoVazio: { color: '#999', fontStyle: 'italic', padding: 10, fontSize: 13 },
+  enderecoTexto: { fontSize: 13, color: '#666', marginTop: 6, marginBottom: 4 },
   checkboxLinha: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 10 },
   checkbox: {
     width: 20,
