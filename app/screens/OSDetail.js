@@ -1,3 +1,4 @@
+// TODO: item 8 do checklist — cabeçalho colorido por status + lista de colaboradores com acesso à OS. Depende de criar as outras contas de usuário primeiro (5 técnicos + 1 supervisor + 2 admin).
 import { useEffect, useState } from 'react';
 import {
   View,
