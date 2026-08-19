@@ -18,7 +18,7 @@ import {
   tituloMesAno,
 } from '../lib/dateRangeService';
 
-function DayCell({ date, year, month, highlightStart, highlightEnd, onPress }) {
+function DayCell({ date, year, month, highlightStart, highlightEnd, onPress, corTexto }) {
   const noMes = mesmoMes(date, year, month);
   const inicio = highlightStart && mesmaData(date, highlightStart);
   const fim = highlightEnd && mesmaData(date, highlightEnd);
@@ -45,6 +45,7 @@ function DayCell({ date, year, month, highlightStart, highlightEnd, onPress }) {
         <Text
           style={[
             styles.diaTexto,
+            { color: corTexto },
             !noMes && styles.diaTextoFora,
             (inicio || fim || soUmDia) && styles.diaTextoExtremo,
           ]}
@@ -249,6 +250,7 @@ export default function DateRangeFilter({ estado, onEstado, onPeriodoAplicado })
                   highlightStart={highlightStart}
                   highlightEnd={highlightEnd}
                   onPress={tocarData}
+                  corTexto={cores.texto}
                 />
               ))}
             </View>
