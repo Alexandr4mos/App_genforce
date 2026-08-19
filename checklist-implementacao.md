@@ -50,11 +50,11 @@
 - [x] Opção **Importar clientes** (ver item 5)
 - [x] Opção **Modo escuro/claro**: tema global do app inteiro (confirmado 18/08), o toggle mora aqui no menu
 
-## 5. Importar clientes — item 5
+## 5. Importar clientes — item 5 ✅ implementado 18/08
 
-- [ ] Tela de "importar arquivo" (reutilizável, dentro do menu ☰)
-- [ ] Carga inicial: os ~50 clientes já extraídos do PDF `Genforce | Clientes` (nome, razão social, endereço) — não precisa esperar nada, já tenho os dados
-- [ ] Seletor de cliente com busca (campo "Procurar...", estilo do 8Confirma) reutilizado onde escolhe cliente (Nova OS, Relatório etc.)
+- [x] Tela de "importar arquivo" (reutilizável, dentro do menu ☰)
+- [ ] Carga inicial: os ~50 clientes já extraídos do PDF `Genforce | Clientes` (nome, razão social, endereço) — arquivo ainda não está na pasta do projeto; a tela de importação está pronta pra receber o CSV
+- [x] Seletor de cliente com busca (campo "Procurar...", estilo do 8Confirma) reutilizado onde escolhe cliente (Nova OS, Relatório etc.)
 
 ## 6. Remanejar OS — item 8
 

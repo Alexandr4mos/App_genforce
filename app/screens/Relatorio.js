@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
@@ -11,11 +10,11 @@ import {
 import { supabase } from '../lib/supabase';
 import { avisar } from '../lib/avisos';
 import { useTema } from '../lib/tema';
+import SeletorCliente from '../components/SeletorCliente';
 
 export default function Relatorio({ onBack }) {
   const { cores } = useTema();
   const [clientes, setClientes] = useState([]);
-  const [busca, setBusca] = useState('');
   const [clienteId, setClienteId] = useState(null);
   const [pendencias, setPendencias] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -92,11 +91,6 @@ export default function Relatorio({ onBack }) {
     setPendencias(data || []);
   }
 
-  const termo = busca.trim().toLowerCase();
-  const clientesFiltrados = clientes.filter((c) => {
-    if (!termo) return true;
-    return `${c.nome} ${c.razao_social || ''}`.toLowerCase().includes(termo);
-  });
   const clienteAtual = clientes.find((c) => c.id === clienteId);
 
   function formatarData(valor) {
@@ -118,51 +112,11 @@ export default function Relatorio({ onBack }) {
       </Text>
 
       <Text style={[styles.label, { color: cores.texto }]}>Cliente</Text>
-      <TextInput
-        style={[
-          styles.input,
-          { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard },
-        ]}
-        placeholder="Procurar..."
-        placeholderTextColor={cores.placeholder}
-        value={busca}
-        onChangeText={setBusca}
+      <SeletorCliente
+        clientes={clientes}
+        clienteId={clienteId}
+        onSelecionar={(c) => escolherCliente(c.id)}
       />
-
-      <View style={[styles.listaBox, { borderColor: cores.borda }]}>
-        {clientesFiltrados.map((c) => (
-          <TouchableOpacity
-            key={c.id}
-            style={[
-              styles.itemLista,
-              clienteId === c.id && { backgroundColor: cores.primario },
-            ]}
-            onPress={() => escolherCliente(c.id)}
-          >
-            <Text
-              style={[
-                styles.itemNome,
-                { color: clienteId === c.id ? '#fff' : cores.texto },
-              ]}
-            >
-              {c.nome}
-            </Text>
-            {c.razao_social ? (
-              <Text
-                style={[
-                  styles.itemRazao,
-                  { color: clienteId === c.id ? '#e8f1ff' : cores.textoSecundario },
-                ]}
-              >
-                {c.razao_social}
-              </Text>
-            ) : null}
-          </TouchableOpacity>
-        ))}
-        {clientesFiltrados.length === 0 ? (
-          <Text style={[styles.avisoVazio, { color: cores.textoSuave }]}>Nenhum cliente encontrado.</Text>
-        ) : null}
-      </View>
 
       {clienteAtual ? (
         <>

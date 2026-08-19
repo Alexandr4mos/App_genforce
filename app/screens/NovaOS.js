@@ -13,6 +13,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { TIPOS_OS, TEMPLATE_PADRAO_ID } from '../lib/constantes';
 import { useTema } from '../lib/tema';
+import SeletorCliente from '../components/SeletorCliente';
 
 function avisar(mensagem, titulo = 'Aviso') {
   if (Platform.OS === 'web') {
@@ -82,7 +83,7 @@ export default function NovaOS({ onBack, onCriada }) {
   }, [unidadeId]);
 
   async function carregarClientes() {
-    const { data } = await supabase.from('clientes').select('id, nome').order('nome');
+    const { data } = await supabase.from('clientes').select('id, nome, razao_social').order('nome');
     setClientes(data || []);
   }
 
@@ -121,7 +122,7 @@ export default function NovaOS({ onBack, onCriada }) {
     const { data, error } = await supabase
       .from('clientes')
       .insert({ nome: novoClienteNome.trim() })
-      .select('id, nome')
+      .select('id, nome, razao_social')
       .single();
     setSalvandoCliente(false);
 
@@ -300,20 +301,11 @@ export default function NovaOS({ onBack, onCriada }) {
       <Text style={[styles.title, { color: cores.texto }]}>Nova OS</Text>
 
       <Text style={[styles.label, { color: cores.texto }]}>Cliente</Text>
-      <View style={[styles.listaBox, { borderColor: cores.borda }]}>
-        {clientes.map((c) => (
-          <TouchableOpacity
-            key={c.id}
-            style={[styles.itemLista, clienteId === c.id && styles.itemListaSelecionado]}
-            onPress={() => setClienteId(c.id)}
-          >
-            <Text style={clienteId === c.id ? styles.itemListaTextoSelecionado : [styles.itemListaTexto, { color: cores.texto }]}>
-              {c.nome}
-            </Text>
-          </TouchableOpacity>
-        ))}
-        {clientes.length === 0 ? <Text style={[styles.avisoVazio, { color: cores.textoSuave }]}>Nenhum cliente cadastrado.</Text> : null}
-      </View>
+      <SeletorCliente
+        clientes={clientes}
+        clienteId={clienteId}
+        onSelecionar={(c) => setClienteId(c.id)}
+      />
 
       {mostrarNovoCliente ? (
         <View style={styles.novoEquipamentoForm}>
