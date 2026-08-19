@@ -14,30 +14,33 @@
 
 ---
 
-## 1. Banco de dados (Supabase)
+## 1. Banco de dados (Supabase) ✅ implementado 18/08
 
-- [ ] Adicionar `agendado` na lista de status possíveis de `ordens_servico` (item 8)
-- [ ] Revisar se precisa de mais status pra bater com os 6 do 8Confirma (urgente/atrasada, agendada, em aberto, pausada, concluída, arquivada) — hoje temos só pendente/andamento/pausada/concluida (item 2)
+- [x] Adicionar `agendado` na lista de status possíveis de `ordens_servico` (item 8) — status é campo texto livre, código já usa o valor novo (ver `lib/constantes.js`)
+- [x] Criada tabela `os_tipos` pra suportar múltiplos tipos por OS (ver item 2b). Migração em `migracao-01-tipos-e-agendado.sql` — **rodar manualmente no SQL Editor do Supabase**
+- [ ] Ainda em aberto: revisar se precisa de mais status pra bater com os 6 do 8Confirma (urgente/atrasada, agendada, em aberto, pausada, concluída, arquivada) — por ora ficou só pendente/andamento/pausada/concluida/agendado
 
-## 2. Editar OS (`EditarOS.js`) — item 1
+## 2. Editar OS (`EditarOS.js`) — item 1 ✅ implementado 18/08
 
-- [ ] (a) Trazer a seleção de geradores do `NovaOS.js` pra dentro de `EditarOS.js` — trocar/adicionar/remover geradores vinculados à OS
-- [ ] (b) Criar forma de editar os dados cadastrais de um gerador já existente (fabricante, potência etc.) — não existe em nenhum lugar do app hoje
+- [x] (a) Trazer a seleção de geradores do `NovaOS.js` pra dentro de `EditarOS.js` — trocar/adicionar/remover geradores vinculados à OS
+- [x] (b) Criar forma de editar os dados cadastrais de um gerador já existente (fabricante, potência etc.) — botão "✎ editar" em cada gerador na lista
 
-## 2b. Tipo de OS / Modalidade — item 6 (corrigido 18/08)
+## 2b. Tipo de OS / Modalidade — item 6 (corrigido 18/08) ✅ implementado 18/08
 
-- [ ] Atualizar as opções de `TIPOS_OS` (em `NovaOS.js`/`EditarOS.js`) pros 5 valores do 8Confirma: Atendimento de Emergência, Manutenção Corretiva, Visita Técnica, Teste com Carga Programado, Manutenção Preventiva (no lugar dos 4 atuais: preventiva/corretiva/visita_tecnica/observacao)
+- [x] Atualizar as opções de `TIPOS_OS` (agora em `lib/constantes.js`, importado por `NovaOS.js`/`EditarOS.js`) pros 5 valores do 8Confirma: Atendimento de Emergência, Manutenção Corretiva, Visita Técnica, Teste com Carga Programado, Manutenção Preventiva (no lugar dos 4 antigos: preventiva/corretiva/visita_tecnica/observacao)
 - [x] **Confirmado (18/08): seleção múltipla.** Pode marcar mais de um tipo na mesma OS, com checkbox + chips removíveis (igual ao print do 8Confirma). Isso muda o campo `tipo`: deixa de ser um texto único e vira uma lista — no banco, melhor caminho é uma tabela própria (`os_tipos` ou similar, ligando `ordens_servico` a vários valores de tipo) em vez de tentar guardar array direto num campo texto
 - QR code continua eliminado, não mexer
 
-## 3. Lista de OS — dinâmica e visual (item 2 + item 7/8) ★ maior bloco
+## 3. Lista de OS — dinâmica e visual (item 2 + item 7/8) ★ maior bloco ✅ implementado 18/08
 
-- [ ] Resumo com contadores por status (chips coloridos no topo, como no print do 8Confirma)
-- [ ] Barra de busca + Filtros + Ordenar + Status (dropdowns)
-- [ ] Filtro de período com presets: Hoje, Ontem, Amanhã, Mês Atual, Mês Anterior, Próximo Mês, Personalizado (seguir a spec técnica em `especificacao-date-range-picker.md` à risca: presets calculados dinamicamente, `appliedRange`/`draftRange` separados, sem botão "Aplicar" no personalizado, proteção contra requisição antiga sobrescrever a mais nova)
-- [ ] Cards de OS mais ricos: janela de data/hora prevista (início → fim), nome do cliente + razão social embaixo, chip do tipo de manutenção, chip por equipamento com marca/modelo, descrição
-- [ ] Status "Agendado" refletido visualmente (chip azul, ícone de calendário)
-- [ ] Cor por status na borda de cada card (estender a lógica que já existe pra cobrir todos os status, incluindo "Agendado") + bordas arredondadas nos cards (item 9)
+> Redesign completo na lista: contadores, busca/filtros, date range picker (spec), cards ricos e borda colorida por status. Código em `app/screens/ListaOS.js`, `app/components/DateRangeFilter.js` e `app/lib/dateRangeService.js`. Timezone do calendário: `America/Sao_Paulo`.
+
+- [x] Resumo com contadores por status (chips coloridos no topo, como no print do 8Confirma)
+- [x] Barra de busca + Filtros + Ordenar + Status (dropdowns)
+- [x] Filtro de período com presets: Hoje, Ontem, Amanhã, Mês Atual, Mês Anterior, Próximo Mês, Personalizado (seguir a spec técnica em `especificacao-date-range-picker.md` à risca: presets calculados dinamicamente, `appliedRange`/`draftRange` separados, sem botão "Aplicar" no personalizado, proteção contra requisição antiga sobrescrever a mais nova)
+- [x] Cards de OS mais ricos: janela de data/hora prevista (início → fim), nome do cliente + razão social embaixo, chip do tipo de manutenção, chip por equipamento com marca/modelo, descrição
+- [x] Status "Agendado" refletido visualmente (chip azul, ícone de calendário)
+- [x] Cor por status na borda de cada card (estender a lógica que já existe pra cobrir todos os status, incluindo "Agendado") + bordas arredondadas nos cards (item 9)
 
 ## 4. Menu hambúrguer (☰) — item 4
 
