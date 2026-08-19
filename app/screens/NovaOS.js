@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { TIPOS_OS, TEMPLATE_PADRAO_ID } from '../lib/constantes';
+import { useTema } from '../lib/tema';
 
 function avisar(mensagem, titulo = 'Aviso') {
   if (Platform.OS === 'web') {
@@ -22,6 +23,7 @@ function avisar(mensagem, titulo = 'Aviso') {
 }
 
 export default function NovaOS({ onBack, onCriada }) {
+  const { cores } = useTema();
   const [clientes, setClientes] = useState([]);
   const [clienteId, setClienteId] = useState(null);
 
@@ -290,34 +292,35 @@ export default function NovaOS({ onBack, onCriada }) {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { backgroundColor: cores.fundo }]}>
       <TouchableOpacity onPress={onBack} style={styles.backButton}>
-        <Text style={styles.backText}>{'< Voltar'}</Text>
+        <Text style={[styles.backText, { color: cores.primario }]}>{'< Voltar'}</Text>
       </TouchableOpacity>
 
-      <Text style={styles.title}>Nova OS</Text>
+      <Text style={[styles.title, { color: cores.texto }]}>Nova OS</Text>
 
-      <Text style={styles.label}>Cliente</Text>
-      <View style={styles.listaBox}>
+      <Text style={[styles.label, { color: cores.texto }]}>Cliente</Text>
+      <View style={[styles.listaBox, { borderColor: cores.borda }]}>
         {clientes.map((c) => (
           <TouchableOpacity
             key={c.id}
             style={[styles.itemLista, clienteId === c.id && styles.itemListaSelecionado]}
             onPress={() => setClienteId(c.id)}
           >
-            <Text style={clienteId === c.id ? styles.itemListaTextoSelecionado : styles.itemListaTexto}>
+            <Text style={clienteId === c.id ? styles.itemListaTextoSelecionado : [styles.itemListaTexto, { color: cores.texto }]}>
               {c.nome}
             </Text>
           </TouchableOpacity>
         ))}
-        {clientes.length === 0 ? <Text style={styles.avisoVazio}>Nenhum cliente cadastrado.</Text> : null}
+        {clientes.length === 0 ? <Text style={[styles.avisoVazio, { color: cores.textoSuave }]}>Nenhum cliente cadastrado.</Text> : null}
       </View>
 
       {mostrarNovoCliente ? (
         <View style={styles.novoEquipamentoForm}>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
             placeholder="Nome do cliente *"
+            placeholderTextColor={cores.placeholder}
             value={novoClienteNome}
             onChangeText={setNovoClienteNome}
           />
@@ -335,8 +338,8 @@ export default function NovaOS({ onBack, onCriada }) {
 
       {clienteId ? (
         <>
-          <Text style={styles.label}>Unidade</Text>
-          <View style={styles.listaBox}>
+          <Text style={[styles.label, { color: cores.texto }]}>Unidade</Text>
+          <View style={[styles.listaBox, { borderColor: cores.borda }]}>
             {unidades.map((u) => (
               <TouchableOpacity
                 key={u.id}
@@ -346,30 +349,30 @@ export default function NovaOS({ onBack, onCriada }) {
                   setUnidadeSelecionadaInfo(u);
                 }}
               >
-                <Text style={unidadeId === u.id ? styles.itemListaTextoSelecionado : styles.itemListaTexto}>
+                <Text style={unidadeId === u.id ? styles.itemListaTextoSelecionado : [styles.itemListaTexto, { color: cores.texto }]}>
                   {u.nome}
                 </Text>
               </TouchableOpacity>
             ))}
             {unidades.length === 0 ? (
-              <Text style={styles.avisoVazio}>Nenhuma unidade cadastrada para este cliente.</Text>
+              <Text style={[styles.avisoVazio, { color: cores.textoSuave }]}>Nenhuma unidade cadastrada para este cliente.</Text>
             ) : null}
           </View>
 
           {unidadeSelecionadaInfo?.endereco ? (
-            <Text style={styles.enderecoTexto}>📍 {unidadeSelecionadaInfo.endereco}</Text>
+            <Text style={[styles.enderecoTexto, { color: cores.textoSecundario }]}>📍 {unidadeSelecionadaInfo.endereco}</Text>
           ) : null}
 
           {mostrarNovaUnidade ? (
             <View style={styles.novoEquipamentoForm}>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
                 placeholder="Nome da unidade (ex: Sede, Filial Norte) *"
                 value={novaUnidadeNome}
                 onChangeText={setNovaUnidadeNome}
               />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
                 placeholder="Endereço / localização"
                 value={novaUnidadeEndereco}
                 onChangeText={setNovaUnidadeEndereco}
@@ -390,8 +393,8 @@ export default function NovaOS({ onBack, onCriada }) {
 
       {unidadeId ? (
         <>
-          <Text style={styles.label}>Geradores (marque um ou mais)</Text>
-          <View style={styles.listaBox}>
+          <Text style={[styles.label, { color: cores.texto }]}>Geradores (marque um ou mais)</Text>
+          <View style={[styles.listaBox, { borderColor: cores.borda }]}>
             {equipamentos.map((e) => (
               <TouchableOpacity
                 key={e.id}
@@ -406,45 +409,45 @@ export default function NovaOS({ onBack, onCriada }) {
                 >
                   {equipamentosSelecionados[e.id] ? <Text style={styles.checkboxMarcaTexto}>✓</Text> : null}
                 </View>
-                <Text style={styles.itemListaTexto}>
+                <Text style={[styles.itemListaTexto, { color: cores.texto }]}>
                   {e.tag} {e.fabricante_gmg ? `— ${e.fabricante_gmg}` : ''}
                 </Text>
               </TouchableOpacity>
             ))}
             {equipamentos.length === 0 ? (
-              <Text style={styles.avisoVazio}>Nenhum gerador cadastrado nesta unidade ainda.</Text>
+              <Text style={[styles.avisoVazio, { color: cores.textoSuave }]}>Nenhum gerador cadastrado nesta unidade ainda.</Text>
             ) : null}
           </View>
 
           {mostrarNovoEquipamento ? (
             <View style={styles.novoEquipamentoForm}>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
                 placeholder="Identificação (ex: GMG 03) *"
                 value={novoTag}
                 onChangeText={setNovoTag}
               />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
                 placeholder="Fabricante do GMG"
                 value={novoFabricante}
                 onChangeText={setNovoFabricante}
               />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
                 placeholder="Potência (KVA)"
                 value={novoPotencia}
                 onChangeText={setNovoPotencia}
                 keyboardType="numeric"
               />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
                 placeholder="Placa do motor"
                 value={novoPlacaMotor}
                 onChangeText={setNovoPlacaMotor}
               />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
                 placeholder="Placa do alternador"
                 value={novoPlacaAlternador}
                 onChangeText={setNovoPlacaAlternador}
@@ -464,7 +467,7 @@ export default function NovaOS({ onBack, onCriada }) {
             </TouchableOpacity>
           )}
 
-          <Text style={styles.label}>Tipo de OS (marque um ou mais)</Text>
+          <Text style={[styles.label, { color: cores.texto }]}>Tipo de OS (marque um ou mais)</Text>
           <View style={styles.tipoRow}>
             {TIPOS_OS.map((t) => (
               <TouchableOpacity
@@ -480,18 +483,20 @@ export default function NovaOS({ onBack, onCriada }) {
             ))}
           </View>
 
-          <Text style={styles.label}>Data prevista da manutenção</Text>
+          <Text style={[styles.label, { color: cores.texto }]}>Data prevista da manutenção</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
             placeholder="DD/MM/AAAA"
+            placeholderTextColor={cores.placeholder}
             value={dataPrevista}
             onChangeText={setDataPrevista}
           />
 
-          <Text style={styles.label}>Descrição</Text>
+          <Text style={[styles.label, { color: cores.texto }]}>Descrição</Text>
           <TextInput
-            style={[styles.input, styles.descricaoInput]}
+            style={[styles.input, styles.descricaoInput, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
             placeholder="Descrição da OS..."
+            placeholderTextColor={cores.placeholder}
             value={descricao}
             onChangeText={setDescricao}
             multiline

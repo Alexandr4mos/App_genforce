@@ -42,13 +42,13 @@
 - [x] Status "Agendado" refletido visualmente (chip azul, ícone de calendário)
 - [x] Cor por status na borda de cada card (estender a lógica que já existe pra cobrir todos os status, incluindo "Agendado") + bordas arredondadas nos cards (item 9)
 
-## 4. Menu hambúrguer (☰) — item 4
+## 4. Menu hambúrguer (☰) — item 4 ✅ implementado 18/08
 
-- [ ] Ícone de três barras no canto superior da lista de OS
-- [ ] Opção **Criar OS** (tira o botão fixo "+ Nova OS" da tela)
-- [ ] Opção **Relatório**: busca cliente → mostra pendências já baixadas (resolvidas) daquele cliente. Pendência aberta não aparece — fica só na OS
-- [ ] Opção **Importar clientes** (ver item 5)
-- [ ] Opção **Modo escuro/claro**: tema global do app inteiro (confirmado 18/08), o toggle mora aqui no menu
+- [x] Ícone de três barras no canto superior da lista de OS
+- [x] Opção **Criar OS** (tira o botão fixo "+ Nova OS" da tela)
+- [x] Opção **Relatório**: busca cliente → mostra pendências já baixadas (resolvidas) daquele cliente. Pendência aberta não aparece — fica só na OS
+- [x] Opção **Importar clientes** (ver item 5)
+- [x] Opção **Modo escuro/claro**: tema global do app inteiro (confirmado 18/08), o toggle mora aqui no menu
 
 ## 5. Importar clientes — item 5
 

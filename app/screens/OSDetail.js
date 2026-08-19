@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
+import { useTema } from '../lib/tema';
 
 function avisar(mensagem, titulo = 'Aviso') {
   if (Platform.OS === 'web') {
@@ -43,6 +44,7 @@ function chave(osEquipamentoId, templateItemId) {
 }
 
 export default function OSDetail({ osId, userId, onBack }) {
+  const { cores } = useTema();
   const [loading, setLoading] = useState(true);
   const [osEquipamentos, setOsEquipamentos] = useState([]);
   const [respostas, setRespostas] = useState({});
@@ -733,25 +735,25 @@ export default function OSDetail({ osId, userId, onBack }) {
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: cores.fundo }]}>
         <ActivityIndicator />
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { backgroundColor: cores.fundo }]}>
       <TouchableOpacity onPress={onBack} style={styles.backButton}>
-        <Text style={styles.backText}>{'< Voltar'}</Text>
+        <Text style={[styles.backText, { color: cores.primario }]}>{'< Voltar'}</Text>
       </TouchableOpacity>
 
-      <Text style={styles.title}>Detalhe da OS</Text>
+      <Text style={[styles.title, { color: cores.texto }]}>Detalhe da OS</Text>
 
       <TouchableOpacity style={styles.atualizarBotao} onPress={atualizarDados}>
         <Text style={styles.atualizarBotaoTexto}>🔄 Atualizar (ver o que outros técnicos já preencheram)</Text>
       </TouchableOpacity>
 
-      <View style={styles.checkinSection}>
+      <View style={[styles.checkinSection, { backgroundColor: cores.fundoSecundario, borderColor: cores.borda }]}>
         {!osInfo?.checkin_em ? (
           <TouchableOpacity
             style={styles.checkinBotao}
@@ -764,11 +766,11 @@ export default function OSDetail({ osId, userId, onBack }) {
           </TouchableOpacity>
         ) : (
           <>
-            <Text style={styles.checkinInfoTexto}>
+            <Text style={[styles.checkinInfoTexto, { color: cores.texto }]}>
               Check-in: {formatarHorario(osInfo.checkin_em)}
             </Text>
             {osInfo?.checkout_em ? (
-              <Text style={styles.checkinInfoTexto}>
+              <Text style={[styles.checkinInfoTexto, { color: cores.texto }]}>
                 Check-out: {formatarHorario(osInfo.checkout_em)}
               </Text>
             ) : (
@@ -794,7 +796,7 @@ export default function OSDetail({ osId, userId, onBack }) {
       </View>
 
       {osEquipamentos.length === 0 ? (
-        <Text>Nenhum equipamento vinculado a esta OS ainda.</Text>
+        <Text style={{ color: cores.texto }}>Nenhum equipamento vinculado a esta OS ainda.</Text>
       ) : null}
 
       {!osInfo?.checkin_em ? (
@@ -807,12 +809,12 @@ export default function OSDetail({ osId, userId, onBack }) {
         <>
           {osEquipamentos.map((eq) => (
         <View key={eq.id} style={styles.equipamentoBlock}>
-          <Text style={styles.equipamentoTitle}>
+          <Text style={[styles.equipamentoTitle, { color: cores.texto }]}>
             {eq.equipamentos?.tag} — {eq.equipamentos?.fabricante_gmg}
           </Text>
 
-          <View style={styles.pendenciasSection}>
-            <Text style={styles.pendenciasTitulo}>Pendências</Text>
+          <View style={[styles.pendenciasSection, { backgroundColor: cores.fundoSecundario, borderColor: cores.borda }]}>
+            <Text style={[styles.pendenciasTitulo, { color: cores.texto }]}>Pendências</Text>
 
             {(pendenciasPorEquipamento[eq.equipamento_id] || []).length === 0 ? (
               <Text style={styles.semPendencias}>Nenhuma pendência registrada.</Text>
@@ -969,9 +971,9 @@ export default function OSDetail({ osId, userId, onBack }) {
           </View>
 
           {eq.itens.map((item) => (
-            <View key={item.id} style={styles.itemBlock}>
-              <Text style={styles.itemGrupo}>{item.grupo}</Text>
-              <Text style={styles.itemTitulo}>{item.titulo}</Text>
+            <View key={item.id} style={[styles.itemBlock, { borderColor: cores.borda }]}>
+              <Text style={[styles.itemGrupo, { color: cores.textoSuave }]}>{item.grupo}</Text>
+              <Text style={[styles.itemTitulo, { color: cores.texto }]}>{item.titulo}</Text>
 
               {item.tipo_resposta === 'numero' ? (
                 <TextInput
@@ -1064,8 +1066,8 @@ export default function OSDetail({ osId, userId, onBack }) {
         </View>
       ))}
 
-      <View style={styles.observacaoGeralSection}>
-        <Text style={styles.pendenciasTitulo}>Observação geral da OS</Text>
+      <View style={[styles.observacaoGeralSection, { backgroundColor: cores.fundoSecundario, borderColor: cores.borda }]}>
+        <Text style={[styles.pendenciasTitulo, { color: cores.texto }]}>Observação geral da OS</Text>
         <TextInput
           style={[styles.observacaoInput, styles.observacaoGeralInput]}
           placeholder="Observações gerais sobre a manutenção..."

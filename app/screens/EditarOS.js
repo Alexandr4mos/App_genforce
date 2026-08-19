@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { TIPOS_OS, STATUS_OS, TEMPLATE_PADRAO_ID } from '../lib/constantes';
+import { useTema } from '../lib/tema';
 
 function avisar(mensagem, titulo = 'Aviso') {
   if (Platform.OS === 'web') {
@@ -35,6 +36,7 @@ function confirmarAcao(mensagem) {
 }
 
 export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
+  const { cores } = useTema();
   const [loading, setLoading] = useState(true);
   const [unidadeId, setUnidadeId] = useState(null);
   const [tiposSelecionados, setTiposSelecionados] = useState({});
@@ -334,21 +336,21 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: cores.fundo }]}>
         <ActivityIndicator />
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { backgroundColor: cores.fundo }]}>
       <TouchableOpacity onPress={onBack} style={styles.backButton}>
-        <Text style={styles.backText}>{'< Voltar'}</Text>
+        <Text style={[styles.backText, { color: cores.primario }]}>{'< Voltar'}</Text>
       </TouchableOpacity>
 
-      <Text style={styles.title}>Editar OS</Text>
+      <Text style={[styles.title, { color: cores.texto }]}>Editar OS</Text>
 
-      <Text style={styles.label}>Tipo de OS (marque um ou mais)</Text>
+      <Text style={[styles.label, { color: cores.texto }]}>Tipo de OS (marque um ou mais)</Text>
       <View style={styles.tipoRow}>
         {TIPOS_OS.map((t) => (
           <TouchableOpacity
@@ -356,7 +358,7 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
             style={[styles.tipoButton, tiposSelecionados[t.valor] && styles.tipoButtonSelecionado]}
             onPress={() => alternarTipo(t.valor)}
           >
-            <Text style={tiposSelecionados[t.valor] ? styles.tipoTextoSelecionado : styles.tipoTexto}>
+            <Text style={tiposSelecionados[t.valor] ? styles.tipoTextoSelecionado : [styles.tipoTexto, { color: cores.texto }]}>
               {tiposSelecionados[t.valor] ? '✓ ' : ''}
               {t.rotulo}
             </Text>
@@ -364,7 +366,7 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
         ))}
       </View>
 
-      <Text style={styles.label}>Status</Text>
+      <Text style={[styles.label, { color: cores.texto }]}>Status</Text>
       <View style={styles.tipoRow}>
         {STATUS_OS.map((s) => (
           <TouchableOpacity
@@ -372,32 +374,34 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
             style={[styles.tipoButton, status === s.valor && styles.tipoButtonSelecionado]}
             onPress={() => setStatus(s.valor)}
           >
-            <Text style={status === s.valor ? styles.tipoTextoSelecionado : styles.tipoTexto}>
+            <Text style={status === s.valor ? styles.tipoTextoSelecionado : [styles.tipoTexto, { color: cores.texto }]}>
               {s.rotulo}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      <Text style={styles.label}>Data prevista da manutenção</Text>
+      <Text style={[styles.label, { color: cores.texto }]}>Data prevista da manutenção</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
         placeholder="DD/MM/AAAA"
+        placeholderTextColor={cores.placeholder}
         value={dataPrevista}
         onChangeText={setDataPrevista}
       />
 
-      <Text style={styles.label}>Descrição</Text>
+      <Text style={[styles.label, { color: cores.texto }]}>Descrição</Text>
       <TextInput
-        style={[styles.input, styles.descricaoInput]}
+        style={[styles.input, styles.descricaoInput, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
         placeholder="Descrição da OS..."
+        placeholderTextColor={cores.placeholder}
         value={descricao}
         onChangeText={setDescricao}
         multiline
       />
 
-      <Text style={styles.label}>Geradores (marque um ou mais)</Text>
-      <View style={styles.listaBox}>
+      <Text style={[styles.label, { color: cores.texto }]}>Geradores (marque um ou mais)</Text>
+      <View style={[styles.listaBox, { borderColor: cores.borda }]}>
         {equipamentos.map((e) => (
           <View key={e.id}>
             <View style={styles.checkboxLinha}>
@@ -413,7 +417,7 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
                 >
                   {equipamentosSelecionados[e.id] ? <Text style={styles.checkboxMarcaTexto}>✓</Text> : null}
                 </View>
-                <Text style={styles.itemListaTexto}>
+                <Text style={[styles.itemListaTexto, { color: cores.texto }]}>
                   {e.tag} {e.fabricante_gmg ? `— ${e.fabricante_gmg}` : ''}
                 </Text>
               </TouchableOpacity>
@@ -425,32 +429,32 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
             {equipamentoEditandoId === e.id ? (
               <View style={styles.novoEquipamentoForm}>
                 <TextInput
-                  style={styles.input}
+                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
                   placeholder="Identificação (ex: GMG 03) *"
                   value={edTag}
                   onChangeText={setEdTag}
                 />
                 <TextInput
-                  style={styles.input}
+                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
                   placeholder="Fabricante do GMG"
                   value={edFabricante}
                   onChangeText={setEdFabricante}
                 />
                 <TextInput
-                  style={styles.input}
+                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
                   placeholder="Potência (KVA)"
                   value={edPotencia}
                   onChangeText={setEdPotencia}
                   keyboardType="numeric"
                 />
                 <TextInput
-                  style={styles.input}
+                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
                   placeholder="Placa do motor"
                   value={edPlacaMotor}
                   onChangeText={setEdPlacaMotor}
                 />
                 <TextInput
-                  style={styles.input}
+                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
                   placeholder="Placa do alternador"
                   value={edPlacaAlternador}
                   onChangeText={setEdPlacaAlternador}
@@ -475,39 +479,39 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
           </View>
         ))}
         {equipamentos.length === 0 ? (
-          <Text style={styles.avisoVazio}>Nenhum gerador cadastrado nesta unidade ainda.</Text>
+          <Text style={[styles.avisoVazio, { color: cores.textoSuave }]}>Nenhum gerador cadastrado nesta unidade ainda.</Text>
         ) : null}
       </View>
 
       {mostrarNovoEquipamento ? (
         <View style={styles.novoEquipamentoForm}>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
             placeholder="Identificação (ex: GMG 03) *"
             value={novoTag}
             onChangeText={setNovoTag}
           />
           <TextInput
-            style={styles.input}
+            style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
             placeholder="Fabricante do GMG"
             value={novoFabricante}
             onChangeText={setNovoFabricante}
           />
           <TextInput
-            style={styles.input}
+            style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
             placeholder="Potência (KVA)"
             value={novoPotencia}
             onChangeText={setNovoPotencia}
             keyboardType="numeric"
           />
           <TextInput
-            style={styles.input}
+            style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
             placeholder="Placa do motor"
             value={novoPlacaMotor}
             onChangeText={setNovoPlacaMotor}
           />
           <TextInput
-            style={styles.input}
+            style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
             placeholder="Placa do alternador"
             value={novoPlacaAlternador}
             onChangeText={setNovoPlacaAlternador}

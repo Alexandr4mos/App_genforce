@@ -1,4 +1,5 @@
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTema } from '../lib/tema';
 import {
   DIAS_SEMANA,
   PRESETS,
@@ -56,6 +57,7 @@ function DayCell({ date, year, month, highlightStart, highlightEnd, onPress }) {
 }
 
 export default function DateRangeFilter({ estado, onEstado, onPeriodoAplicado }) {
+  const { cores } = useTema();
   const { titulo, subtitulo } = rotuloGatilho(estado.selectedPreset, estado.appliedRange);
 
   function atualizar(parcial) {
@@ -160,12 +162,16 @@ export default function DateRangeFilter({ estado, onEstado, onPeriodoAplicado })
 
   return (
     <>
-      <TouchableOpacity style={styles.gatilho} onPress={abrirPresets} activeOpacity={0.8}>
+      <TouchableOpacity
+        style={[styles.gatilho, { borderColor: cores.borda, backgroundColor: cores.fundoSecundario }]}
+        onPress={abrirPresets}
+        activeOpacity={0.8}
+      >
         <View>
-          <Text style={styles.gatilhoTitulo}>{titulo}</Text>
-          <Text style={styles.gatilhoSubtitulo}>{subtitulo}</Text>
+          <Text style={[styles.gatilhoTitulo, { color: cores.texto }]}>{titulo}</Text>
+          <Text style={[styles.gatilhoSubtitulo, { color: cores.textoSecundario }]}>{subtitulo}</Text>
         </View>
-        <Text style={styles.gatilhoSeta}>▾</Text>
+        <Text style={[styles.gatilhoSeta, { color: cores.textoSecundario }]}>▾</Text>
       </TouchableOpacity>
 
       <Modal
@@ -174,20 +180,22 @@ export default function DateRangeFilter({ estado, onEstado, onPeriodoAplicado })
         animationType="fade"
         onRequestClose={fecharPresets}
       >
-        <Pressable style={styles.overlay} onPress={fecharPresets}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
+        <Pressable style={[styles.overlay, { backgroundColor: cores.overlay }]} onPress={fecharPresets}>
+          <Pressable style={[styles.sheet, { backgroundColor: cores.fundo }]} onPress={() => {}}>
             <View style={styles.sheetPuxador} />
-            <Text style={styles.sheetTitulo}>Período</Text>
+            <Text style={[styles.sheetTitulo, { color: cores.texto }]}>Período</Text>
             {PRESET_OPCOES.map((opcao) => {
               const ativo = estado.selectedPreset === opcao.valor;
               return (
                 <TouchableOpacity
                   key={opcao.valor}
-                  style={[styles.presetLinha, ativo && styles.presetLinhaAtiva]}
+                  style={[styles.presetLinha, ativo && { backgroundColor: cores.primarioFundo }]}
                   onPress={() => aplicarPreset(opcao.valor)}
                 >
-                  <Text style={[styles.presetTexto, ativo && styles.presetTextoAtivo]}>{opcao.rotulo}</Text>
-                  {ativo ? <Text style={styles.presetCheck}>✓</Text> : null}
+                  <Text style={[styles.presetTexto, { color: ativo ? cores.primario : cores.texto }, ativo && { fontWeight: '700' }]}>
+                    {opcao.rotulo}
+                  </Text>
+                  {ativo ? <Text style={[styles.presetCheck, { color: cores.primario }]}>✓</Text> : null}
                 </TouchableOpacity>
               );
             })}
@@ -201,11 +209,11 @@ export default function DateRangeFilter({ estado, onEstado, onPeriodoAplicado })
         animationType="fade"
         onRequestClose={fecharCalendario}
       >
-        <Pressable style={styles.overlay} onPress={fecharCalendario}>
-          <Pressable style={styles.calendarioSheet} onPress={() => {}}>
+        <Pressable style={[styles.overlay, { backgroundColor: cores.overlay }]} onPress={fecharCalendario}>
+          <Pressable style={[styles.calendarioSheet, { backgroundColor: cores.fundo }]} onPress={() => {}}>
             <View style={styles.sheetPuxador} />
-            <Text style={styles.sheetTitulo}>Personalizado</Text>
-            <Text style={styles.calendarioDica}>
+            <Text style={[styles.sheetTitulo, { color: cores.texto }]}>Personalizado</Text>
+            <Text style={[styles.calendarioDica, { color: cores.textoSecundario }]}>
               {estado.rangeSelectionState === RANGE_SELECTION.SELECTING_END
                 ? 'Toque a data final do intervalo.'
                 : 'Toque a data inicial e, em seguida, a data final.'}
@@ -213,19 +221,19 @@ export default function DateRangeFilter({ estado, onEstado, onPeriodoAplicado })
 
             <View style={styles.calHeader}>
               <TouchableOpacity style={styles.navMes} onPress={() => navegarMes(-1)}>
-                <Text style={styles.navMesTexto}>‹</Text>
+                <Text style={[styles.navMesTexto, { color: cores.primario }]}>‹</Text>
               </TouchableOpacity>
-              <Text style={styles.calMesAno}>
+              <Text style={[styles.calMesAno, { color: cores.texto }]}>
                 {tituloMesAno(estado.calendar.visibleYear, estado.calendar.visibleMonth)}
               </Text>
               <TouchableOpacity style={styles.navMes} onPress={() => navegarMes(1)}>
-                <Text style={styles.navMesTexto}>›</Text>
+                <Text style={[styles.navMesTexto, { color: cores.primario }]}>›</Text>
               </TouchableOpacity>
             </View>
 
             <View style={styles.semanaRow}>
               {DIAS_SEMANA.map((dia) => (
-                <Text key={dia} style={styles.semanaTexto}>
+                <Text key={dia} style={[styles.semanaTexto, { color: cores.textoSuave }]}>
                   {dia}
                 </Text>
               ))}

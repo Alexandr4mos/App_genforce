@@ -12,7 +12,9 @@ import {
 import { supabase } from '../lib/supabase';
 import { avisar, confirmarAcao } from '../lib/avisos';
 import { STATUS_OS, rotuloTipo, rotuloStatus, corDoStatus } from '../lib/constantes';
+import { useTema } from '../lib/tema';
 import DateRangeFilter from '../components/DateRangeFilter';
+import MenuLateral from '../components/MenuLateral';
 import {
   criarEstadoInicialFiltroData,
   formatarJanelaPrevista,
@@ -27,7 +29,16 @@ const OPCOES_ORDENACAO = [
   { valor: 'cliente_asc', rotulo: 'Cliente (A–Z)' },
 ];
 
-export default function ListaOS({ onAbrirOS, onCriarOS, onEditarOS, onSair }) {
+export default function ListaOS({
+  onAbrirOS,
+  onCriarOS,
+  onEditarOS,
+  onRelatorio,
+  onImportarClientes,
+  onSair,
+}) {
+  const { cores, modoEscuro, alternarTema } = useTema();
+  const [menuAberto, setMenuAberto] = useState(false);
   const [dateFilter, setDateFilter] = useState(() => criarEstadoInicialFiltroData());
   const [ordens, setOrdens] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -157,11 +168,11 @@ export default function ListaOS({ onAbrirOS, onCriarOS, onEditarOS, onSair }) {
     const cor = corDoStatus(item.status);
 
     return (
-      <View style={[styles.card, { borderLeftColor: cor }]}>
+      <View style={[styles.card, { borderLeftColor: cor, backgroundColor: cores.fundoCard, borderColor: cores.borda }]}>
         <View style={styles.cardHeaderRow}>
           <TouchableOpacity style={{ flex: 1 }} onPress={() => onAbrirOS(item.id)}>
             <View style={styles.numeroRow}>
-              <Text style={styles.cardTitle}>#{item.numero}</Text>
+              <Text style={[styles.cardTitle, { color: cores.texto }]}>#{item.numero}</Text>
               <View style={[styles.statusChip, { backgroundColor: cor }]}>
                 {agendado ? <Text style={styles.statusChipIcone}>📅 </Text> : null}
                 <Text style={styles.statusChipTexto}>{rotuloStatus(item.status)}</Text>
@@ -172,22 +183,22 @@ export default function ListaOS({ onAbrirOS, onCriarOS, onEditarOS, onSair }) {
             style={styles.menuBotao}
             onPress={() => setMenuAbertoId(menuAbertoId === item.id ? null : item.id)}
           >
-            <Text style={styles.menuBotaoTexto}>⋮</Text>
+            <Text style={[styles.menuBotaoTexto, { color: cores.textoSecundario }]}>⋮</Text>
           </TouchableOpacity>
         </View>
 
         <TouchableOpacity onPress={() => onAbrirOS(item.id)}>
-          {janela ? <Text style={styles.cardJanela}>{janela}</Text> : null}
-          <Text style={styles.cardCliente}>{item.clientes?.nome}</Text>
+          {janela ? <Text style={[styles.cardJanela, { color: cores.textoSecundario }]}>{janela}</Text> : null}
+          <Text style={[styles.cardCliente, { color: cores.primario }]}>{item.clientes?.nome}</Text>
           {item.clientes?.razao_social ? (
-            <Text style={styles.cardRazao}>{item.clientes.razao_social}</Text>
+            <Text style={[styles.cardRazao, { color: cores.textoSuave }]}>{item.clientes.razao_social}</Text>
           ) : null}
 
           {tipos.length > 0 ? (
             <View style={styles.chipsRow}>
               {tipos.map((tipo) => (
-                <View key={tipo} style={styles.chipTipo}>
-                  <Text style={styles.chipTipoTexto}>{rotuloTipo(tipo)}</Text>
+                <View key={tipo} style={[styles.chipTipo, { backgroundColor: cores.chipTipoFundo }]}>
+                  <Text style={[styles.chipTipoTexto, { color: cores.primarioTexto }]}>{rotuloTipo(tipo)}</Text>
                 </View>
               ))}
             </View>
@@ -196,18 +207,18 @@ export default function ListaOS({ onAbrirOS, onCriarOS, onEditarOS, onSair }) {
           {equipamentos.length > 0 ? (
             <View style={styles.chipsRow}>
               {equipamentos.map((rotulo, idx) => (
-                <View key={`${item.id}-eq-${idx}`} style={styles.chipEquip}>
-                  <Text style={styles.chipEquipTexto}>{rotulo}</Text>
+                <View key={`${item.id}-eq-${idx}`} style={[styles.chipEquip, { backgroundColor: cores.chipEquipFundo }]}>
+                  <Text style={[styles.chipEquipTexto, { color: cores.texto }]}>{rotulo}</Text>
                 </View>
               ))}
             </View>
           ) : null}
 
-          {item.descricao ? <Text style={styles.cardDescricao}>{item.descricao}</Text> : null}
+          {item.descricao ? <Text style={[styles.cardDescricao, { color: cores.textoSecundario }]}>{item.descricao}</Text> : null}
         </TouchableOpacity>
 
         {menuAbertoId === item.id ? (
-          <View style={styles.menuDropdown}>
+          <View style={[styles.menuDropdown, { borderColor: cores.borda }]}>
             <TouchableOpacity
               style={styles.menuOpcao}
               onPress={() => {
@@ -215,7 +226,7 @@ export default function ListaOS({ onAbrirOS, onCriarOS, onEditarOS, onSair }) {
                 onEditarOS(item.id);
               }}
             >
-              <Text style={styles.menuOpcaoTexto}>✎ Editar OS</Text>
+              <Text style={[styles.menuOpcaoTexto, { color: cores.texto }]}>✎ Editar OS</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.menuOpcao}
@@ -238,14 +249,33 @@ export default function ListaOS({ onAbrirOS, onCriarOS, onEditarOS, onSair }) {
     : 'Status';
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: cores.fundo }]}>
+      <MenuLateral
+        visivel={menuAberto}
+        onFechar={() => setMenuAberto(false)}
+        itens={[
+          { rotulo: 'Criar OS', onPress: onCriarOS },
+          { rotulo: 'Relatório', onPress: onRelatorio },
+          { rotulo: 'Importar clientes', onPress: onImportarClientes },
+          {
+            rotulo: modoEscuro ? 'Modo claro' : 'Modo escuro',
+            detalhe: modoEscuro ? 'Tema escuro ativo' : 'Tema claro ativo',
+            onPress: alternarTema,
+          },
+          { rotulo: 'Sair', onPress: onSair },
+        ]}
+      />
+
       <View style={styles.tituloRow}>
-        <Text style={styles.title}>Ordens de Serviço</Text>
+        <TouchableOpacity style={styles.hamburguer} onPress={() => setMenuAberto(true)}>
+          <Text style={[styles.hamburguerTexto, { color: cores.texto }]}>☰</Text>
+        </TouchableOpacity>
+        <Text style={[styles.title, { color: cores.texto }]}>Ordens de Serviço</Text>
         <TouchableOpacity
           style={styles.atualizarBotao}
           onPress={() => fetchOrdens(dateFilter.appliedRange)}
         >
-          <Text style={styles.atualizarTexto}>↻</Text>
+          <Text style={[styles.atualizarTexto, { color: cores.primario }]}>↻</Text>
         </TouchableOpacity>
       </View>
 
@@ -279,8 +309,12 @@ export default function ListaOS({ onAbrirOS, onCriarOS, onEditarOS, onSair }) {
       </View>
 
       <TextInput
-        style={styles.busca}
+        style={[
+          styles.busca,
+          { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard },
+        ]}
         placeholder="Buscar cliente, número ou descrição..."
+        placeholderTextColor={cores.placeholder}
         value={busca}
         onChangeText={setBusca}
       />
@@ -288,15 +322,15 @@ export default function ListaOS({ onAbrirOS, onCriarOS, onEditarOS, onSair }) {
       <View style={styles.filtrosRow}>
         <View style={styles.filtroWrap}>
           <TouchableOpacity
-            style={styles.filtroBotao}
+            style={[styles.filtroBotao, { borderColor: cores.borda, backgroundColor: cores.fundoSecundario }]}
             onPress={() => setDropdownAberto(dropdownAberto === 'ordenar' ? null : 'ordenar')}
           >
-            <Text style={styles.filtroBotaoTexto} numberOfLines={1}>
+            <Text style={[styles.filtroBotaoTexto, { color: cores.texto }]} numberOfLines={1}>
               {rotuloOrdenacao} ▾
             </Text>
           </TouchableOpacity>
           {dropdownAberto === 'ordenar' ? (
-            <View style={styles.dropdown}>
+            <View style={[styles.dropdown, { backgroundColor: cores.fundoCard, borderColor: cores.borda }]}>
               {OPCOES_ORDENACAO.map((opcao) => (
                 <TouchableOpacity
                   key={opcao.valor}
@@ -309,7 +343,8 @@ export default function ListaOS({ onAbrirOS, onCriarOS, onEditarOS, onSair }) {
                   <Text
                     style={[
                       styles.dropdownItemTexto,
-                      ordenacao === opcao.valor && styles.dropdownItemAtivo,
+                      { color: cores.texto },
+                      ordenacao === opcao.valor && { color: cores.primario, fontWeight: '700' },
                     ]}
                   >
                     {opcao.rotulo}
@@ -322,15 +357,15 @@ export default function ListaOS({ onAbrirOS, onCriarOS, onEditarOS, onSair }) {
 
         <View style={styles.filtroWrap}>
           <TouchableOpacity
-            style={styles.filtroBotao}
+            style={[styles.filtroBotao, { borderColor: cores.borda, backgroundColor: cores.fundoSecundario }]}
             onPress={() => setDropdownAberto(dropdownAberto === 'status' ? null : 'status')}
           >
-            <Text style={styles.filtroBotaoTexto} numberOfLines={1}>
+            <Text style={[styles.filtroBotaoTexto, { color: cores.texto }]} numberOfLines={1}>
               {rotuloFiltroStatus} ▾
             </Text>
           </TouchableOpacity>
           {dropdownAberto === 'status' ? (
-            <View style={styles.dropdown}>
+            <View style={[styles.dropdown, { backgroundColor: cores.fundoCard, borderColor: cores.borda }]}>
               <TouchableOpacity
                 style={styles.dropdownItem}
                 onPress={() => {
@@ -338,7 +373,13 @@ export default function ListaOS({ onAbrirOS, onCriarOS, onEditarOS, onSair }) {
                   setDropdownAberto(null);
                 }}
               >
-                <Text style={[styles.dropdownItemTexto, !filtroStatus && styles.dropdownItemAtivo]}>
+                <Text
+                  style={[
+                    styles.dropdownItemTexto,
+                    { color: cores.texto },
+                    !filtroStatus && { color: cores.primario, fontWeight: '700' },
+                  ]}
+                >
                   Todos
                 </Text>
               </TouchableOpacity>
@@ -354,7 +395,8 @@ export default function ListaOS({ onAbrirOS, onCriarOS, onEditarOS, onSair }) {
                   <Text
                     style={[
                       styles.dropdownItemTexto,
-                      filtroStatus === s.valor && styles.dropdownItemAtivo,
+                      { color: cores.texto },
+                      filtroStatus === s.valor && { color: cores.primario, fontWeight: '700' },
                     ]}
                   >
                     {s.rotulo}
@@ -369,14 +411,10 @@ export default function ListaOS({ onAbrirOS, onCriarOS, onEditarOS, onSair }) {
       {loading ? <ActivityIndicator style={{ marginVertical: 12 }} /> : null}
       {errorMsg ? (
         <View style={styles.erroBox}>
-          <Text style={styles.error}>{errorMsg}</Text>
+          <Text style={[styles.error, { color: cores.erro }]}>{errorMsg}</Text>
           <Button title="Tentar de novo" onPress={() => fetchOrdens(dateFilter.appliedRange)} />
         </View>
       ) : null}
-
-      <TouchableOpacity style={styles.novaOsBotao} onPress={onCriarOS}>
-        <Text style={styles.novaOsBotaoTexto}>+ Nova OS</Text>
-      </TouchableOpacity>
 
       <FlatList
         data={ordensVisiveis}
@@ -388,21 +426,22 @@ export default function ListaOS({ onAbrirOS, onCriarOS, onEditarOS, onSair }) {
         }}
         ListEmptyComponent={
           loading ? null : (
-            <Text style={styles.vazio}>
-              {errorMsg ? '' : 'Nenhum resultado encontrado.'}
+            <Text style={[styles.vazio, { color: cores.textoSuave }]}>
+              {errorMsg ? '' : 'Nenhum resultado encontrado neste período.'}
             </Text>
           )
         }
       />
-      <Button title="Sair" onPress={onSair} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 60, paddingHorizontal: 16, backgroundColor: '#fff' },
-  tituloRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  title: { fontSize: 22, fontWeight: 'bold' },
+  tituloRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  hamburguer: { paddingRight: 10, paddingVertical: 4 },
+  hamburguerTexto: { fontSize: 26, fontWeight: 'bold' },
+  title: { fontSize: 20, fontWeight: 'bold', flex: 1 },
   atualizarBotao: { paddingHorizontal: 10, paddingVertical: 4 },
   atualizarTexto: { fontSize: 22, color: '#007AFF' },
   contadoresRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 },
