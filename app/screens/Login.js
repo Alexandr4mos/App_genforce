@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import {
   Animated,
   Image,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -28,26 +29,28 @@ export default function Login({
   const slide = useRef(new Animated.Value(36)).current;
   const brilho = useRef(new Animated.Value(-1)).current;
 
+  const usaDriverNativo = Platform.OS !== 'web';
+
   useEffect(() => {
     Animated.timing(zoom, {
       toValue: 1.12,
       duration: 16000,
-      useNativeDriver: true,
+      useNativeDriver: usaDriverNativo,
     }).start();
 
     Animated.parallel([
-      Animated.timing(fade, { toValue: 1, duration: 900, useNativeDriver: true }),
-      Animated.timing(slide, { toValue: 0, duration: 900, useNativeDriver: true }),
+      Animated.timing(fade, { toValue: 1, duration: 900, useNativeDriver: usaDriverNativo }),
+      Animated.timing(slide, { toValue: 0, duration: 900, useNativeDriver: usaDriverNativo }),
     ]).start();
 
     Animated.loop(
       Animated.sequence([
-        Animated.timing(brilho, { toValue: 1, duration: 1400, useNativeDriver: true }),
+        Animated.timing(brilho, { toValue: 1, duration: 1400, useNativeDriver: usaDriverNativo }),
         Animated.delay(2600),
-        Animated.timing(brilho, { toValue: -1, duration: 0, useNativeDriver: true }),
+        Animated.timing(brilho, { toValue: -1, duration: 0, useNativeDriver: usaDriverNativo }),
       ])
     ).start();
-  }, [brilho, fade, slide, zoom]);
+  }, [brilho, fade, slide, zoom, usaDriverNativo]);
 
   const brilhoX = brilho.interpolate({
     inputRange: [-1, 1],
@@ -62,7 +65,7 @@ export default function Login({
         resizeMode="cover"
       />
 
-      <View pointerEvents="none" style={styles.gradienteWrap}>
+      <View style={styles.gradienteWrap}>
         <View style={[styles.gradienteFaixa, { bottom: '42%', opacity: 0.12 }]} />
         <View style={[styles.gradienteFaixa, { bottom: 0, height: '55%', opacity: 0.28 }]} />
         <View style={[styles.gradienteFaixa, { bottom: 0, height: '38%', opacity: 0.42 }]} />
@@ -81,7 +84,6 @@ export default function Login({
           </View>
           <Text style={styles.logoSub}>MANUTENÇÃO</Text>
           <Animated.View
-            pointerEvents="none"
             style={[styles.brilho, { transform: [{ translateX: brilhoX }, { rotate: '18deg' }] }]}
           />
         </View>
@@ -130,6 +132,7 @@ const styles = StyleSheet.create({
   },
   gradienteWrap: {
     ...StyleSheet.absoluteFillObject,
+    pointerEvents: 'none',
   },
   gradienteFaixa: {
     position: 'absolute',
@@ -176,6 +179,7 @@ const styles = StyleSheet.create({
     bottom: -20,
     width: 36,
     backgroundColor: 'rgba(255,255,255,0.28)',
+    pointerEvents: 'none',
   },
   pilula: {
     width: '100%',
