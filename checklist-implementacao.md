@@ -56,9 +56,9 @@
 - [ ] Carga inicial: os ~50 clientes já extraídos do PDF `Genforce | Clientes` (nome, razão social, endereço) — arquivo ainda não está na pasta do projeto; a tela de importação está pronta pra receber o CSV
 - [x] Seletor de cliente com busca (campo "Procurar...", estilo do 8Confirma) reutilizado onde escolhe cliente (Nova OS, Relatório etc.)
 
-## 6. Remanejar OS — item 8
+## 6. Remanejar OS — item 8 ✅ implementado 18/08
 
-- [ ] Opção "Remanejar" no menu de três pontos (⋮) de cada OS na lista, junto com "Editar OS" e "Excluir OS" — muda a data sem excluir/recriar
+- [x] Opção "Remanejar" no menu de três pontos (⋮) de cada OS na lista, junto com "Editar OS" e "Excluir OS" — muda a data sem excluir/recriar
 
 ## 7. Tela de login — item 3
 

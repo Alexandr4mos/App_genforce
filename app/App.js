@@ -9,6 +9,7 @@ import EditarOS from './screens/EditarOS';
 import ListaOS from './screens/ListaOS';
 import Relatorio from './screens/Relatorio';
 import ImportarClientes from './screens/ImportarClientes';
+import RemanejarOS from './screens/RemanejarOS';
 
 export default function App() {
   return (
@@ -30,6 +31,7 @@ function AppInterno() {
   const [osEditandoId, setOsEditandoId] = useState(null);
   const [mostrandoRelatorio, setMostrandoRelatorio] = useState(false);
   const [mostrandoImportar, setMostrandoImportar] = useState(false);
+  const [osRemanejandoId, setOsRemanejandoId] = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
@@ -141,6 +143,19 @@ function AppInterno() {
     );
   }
 
+  if (osRemanejandoId) {
+    return (
+      <>
+        <StatusBar style={modoEscuro ? 'light' : 'dark'} />
+        <RemanejarOS
+          osId={osRemanejandoId}
+          onBack={() => setOsRemanejandoId(null)}
+          onSalvo={() => setOsRemanejandoId(null)}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <StatusBar style={modoEscuro ? 'light' : 'dark'} />
@@ -148,6 +163,7 @@ function AppInterno() {
         onAbrirOS={setOsSelecionadaId}
         onCriarOS={() => setCriandoOS(true)}
         onEditarOS={setOsEditandoId}
+        onRemanejar={setOsRemanejandoId}
         onRelatorio={() => setMostrandoRelatorio(true)}
         onImportarClientes={() => setMostrandoImportar(true)}
         onSair={handleLogout}

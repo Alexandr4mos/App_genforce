@@ -33,6 +33,7 @@ export default function ListaOS({
   onAbrirOS,
   onCriarOS,
   onEditarOS,
+  onRemanejar,
   onRelatorio,
   onImportarClientes,
   onSair,
@@ -227,6 +228,15 @@ export default function ListaOS({
               }}
             >
               <Text style={[styles.menuOpcaoTexto, { color: cores.texto }]}>✎ Editar OS</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuOpcao}
+              onPress={() => {
+                setMenuAbertoId(null);
+                onRemanejar(item.id);
+              }}
+            >
+              <Text style={[styles.menuOpcaoTexto, { color: cores.texto }]}>📅 Remanejar</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.menuOpcao}
