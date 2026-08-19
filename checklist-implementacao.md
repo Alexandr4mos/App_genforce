@@ -60,16 +60,18 @@
 
 - [x] Opção "Remanejar" no menu de três pontos (⋮) de cada OS na lista, junto com "Editar OS" e "Excluir OS" — muda a data sem excluir/recriar
 
-## 7. Tela de login — item 3
+## 7. Tela de login — item 3 ✅ implementado 18/08
 
-- [ ] Foto dos geradores (`assets-login/foto-geradores-capa.jpg`, cor natural, sem filtro azulado) cobrindo a tela inteira de fundo
-- [ ] Logo `assets-login/genforce-logo-transparente.png` (com "ENERGIA" recriado como "MANUTENÇÃO", fallback pra "ENERGIA" se não ficar bom) dentro de uma caixa escura perto do topo, por cima da foto
-- [ ] Campos "Login" e "Senha" em formato de pílula branca arredondada, flutuando direto sobre a foto (sem card/fundo branco atrás)
+- [x] Foto dos geradores (`assets-login/foto-geradores-capa.jpg`, cor natural, sem filtro azulado) cobrindo a tela inteira de fundo
+- [x] Logo `assets-login/genforce-logo-transparente.png` (texto "ENERGIA" recoberto na caixa da logo e substituído por "MANUTENÇÃO" em texto; se a proporção não agradar, volta fácil pra "ENERGIA") dentro de uma caixa escura perto do topo, por cima da foto
+- [x] Campos "Login" e "Senha" em formato de pílula branca arredondada, flutuando direto sobre a foto (sem card/fundo branco atrás)
 - [x] Gradiente escuro sutil da metade pra baixo da foto, pra legibilidade dos campos/botão — **aprovado (18/08)**: "vamos ver como fica, depois qualquer coisa mudamos"
-- [ ] Modo escuro/claro é tema global do app — o próprio login deve respeitar isso, mas a capa com foto provavelmente fica igual nos dois modos (a definir quando chegar lá)
-- [ ] Animação: Ken Burns sutil no fundo + campos surgindo com fade/slide + brilho/pulso de luz na logo ao abrir (é pra testar, pode trocar depois)
+- [x] Modo escuro/claro é tema global do app — o próprio login deve respeitar isso, mas a capa com foto provavelmente fica igual nos dois modos (a definir quando chegar lá)
+- [x] Animação: Ken Burns sutil no fundo + campos surgindo com fade/slide + brilho/pulso de luz na logo ao abrir (é pra testar, pode trocar depois)
 
 ## 8. Tela de detalhe da OS — item 10 (confirmado, baixa prioridade — depois da rodada de teste)
+
+> 18/08: **não implementado de propósito.** Ficou só um `TODO` no topo de `OSDetail.js` pra não esquecer, como combinado.
 
 - [ ] Cabeçalho da tela de detalhe da OS colorido pelo status (mesma lógica de cor do item 9)
 - [ ] Mostrar os técnicos com acesso à OS ("colaboradores")

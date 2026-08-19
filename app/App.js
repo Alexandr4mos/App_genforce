@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from './lib/supabase';
 import { TemaProvider, useTema } from './lib/tema';
@@ -9,6 +8,7 @@ import EditarOS from './screens/EditarOS';
 import ListaOS from './screens/ListaOS';
 import Relatorio from './screens/Relatorio';
 import ImportarClientes from './screens/ImportarClientes';
+import Login from './screens/Login';
 import RemanejarOS from './screens/RemanejarOS';
 
 export default function App() {
@@ -20,7 +20,7 @@ export default function App() {
 }
 
 function AppInterno() {
-  const { cores, modoEscuro } = useTema();
+  const { modoEscuro } = useTema();
   const [session, setSession] = useState(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -58,34 +58,18 @@ function AppInterno() {
 
   if (!session) {
     return (
-      <View style={[styles.container, { backgroundColor: cores.fundo }]}>
-        <StatusBar style={modoEscuro ? 'light' : 'dark'} />
-        <Text style={[styles.title, { color: cores.texto }]}>Genforce — Login</Text>
-        <TextInput
-          style={[
-            styles.input,
-            { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard },
-          ]}
-          placeholder="E-mail"
-          placeholderTextColor={cores.placeholder}
-          autoCapitalize="none"
-          value={email}
-          onChangeText={setEmail}
+      <>
+        <StatusBar style="light" />
+        <Login
+          email={email}
+          password={password}
+          onEmail={setEmail}
+          onPassword={setPassword}
+          onEntrar={handleLogin}
+          loading={loading}
+          errorMsg={errorMsg}
         />
-        <TextInput
-          style={[
-            styles.input,
-            { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard },
-          ]}
-          placeholder="Senha"
-          placeholderTextColor={cores.placeholder}
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
-        {errorMsg ? <Text style={[styles.error, { color: cores.erro }]}>{errorMsg}</Text> : null}
-        <Button title={loading ? 'Entrando...' : 'Entrar'} onPress={handleLogin} disabled={loading} />
-      </View>
+      </>
     );
   }
 
@@ -171,10 +155,3 @@ function AppInterno() {
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 60, paddingHorizontal: 20 },
-  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20 },
-  input: { borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 12 },
-  error: { marginBottom: 12 },
-});
