@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from './lib/supabase';
 import { TemaProvider, useTema } from './lib/tema';
+import { FiltroOSProvider, useFiltroOS } from './lib/filtroOS';
 import OSDetail from './screens/OSDetail';
 import NovaOS from './screens/NovaOS';
 import EditarOS from './screens/EditarOS';
@@ -14,13 +15,16 @@ import RemanejarOS from './screens/RemanejarOS';
 export default function App() {
   return (
     <TemaProvider>
-      <AppInterno />
+      <FiltroOSProvider>
+        <AppInterno />
+      </FiltroOSProvider>
     </TemaProvider>
   );
 }
 
 function AppInterno() {
   const { modoEscuro } = useTema();
+  const { resetFiltros } = useFiltroOS();
   const [session, setSession] = useState(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -54,6 +58,7 @@ function AppInterno() {
     setOsSelecionadaId(null);
     setMostrandoRelatorio(false);
     setMostrandoImportar(false);
+    resetFiltros();
   }
 
   if (!session) {
