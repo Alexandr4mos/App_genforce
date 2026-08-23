@@ -4,6 +4,33 @@
 > numa ordem prática pra começar a codar. Cada item vira uma tarefa concreta.
 > Gerado em 18/08/2026, antes de começar a rodar o código.
 
+> ## ⚠️ ATUALIZAÇÃO 21/08/2026 — leia antes de usar este checklist
+>
+> A conta do Supabase foi trocada e o banco vai ser **recriado do zero**. Enquanto isso não
+> acontecer, nada aqui roda. A ordem de trabalho agora é:
+>
+> 1. `prompt-1-banco-de-dados.md` — recriar o banco via MCP (**bloqueia tudo**)
+> 2. `prompt-2-bugs-e-ajustes.md` — botão de atualizar, filtro que reseta, auto-save, checklist em seções, assinaturas
+> 3. `prompt-3-finalizacao-relatorios-cadastros.md` — fluxo de finalização, Relatórios com filtros, cadastros completos, relatório de peças
+>
+> As seções 3 a 7 abaixo já foram implementadas pela Cursor entre 18 e 20/08 (lista de OS,
+> menu ☰, importar clientes, remanejar, login) — os checkboxes não foram atualizados na época.
+> A seção 8 (detalhe da OS) continua adiada. Ver `requisitos-app.md`, seção
+> "Rodada de 21/08/2026", para a triagem completa e os pontos em aberto.
+
+> ## ✅ PROMPT 2 — Bugs e ajustes (23/08/2026)
+>
+> - [x] Dívida: `avisar`/`confirmarAcao` de `lib/avisos.js` em OSDetail/NovaOS/EditarOS; `corDoStatusPendencia` separado
+> - [x] Ajuste 1: ícone ↻ de atualizar no detalhe da OS
+> - [x] Ajuste 2: filtro de período sobe pra `lib/filtroOS.js` (sobrevive à navegação)
+> - [x] Ajuste 3: auto-save do checklist com indicador Salvando/Salvo/Erro
+> - [x] Ajuste 4: checklist em seções por `grupo` + km saída/retorno + bloco assinaturas
+> - [x] Ajuste 5: assinaturas cliente/técnico (`AssinaturaCampo` + tabela `assinaturas`) — Dashboard comparativo **não** inventado (aguarda Alexandre)
+> - [x] Ajuste 6: race ao salvar unidade em Nova OS + pré-preenche nome na 1ª unidade + RLS insert autenticado
+> - [x] Ajuste 7: `DatePickerCampo` (data única) em Nova OS
+> - [x] Ajuste 8: chips de status com `extraData`, update funcional e barra "Filtrando…"
+> - [x] Ajuste 9: check-in bloqueado em OS `concluida`/`finalizado`
+
 ## Antes de começar — pontos a confirmar (evitam retrabalho)
 
 - [x] **Login (item 3):** ✅ respondido 18/08 com rascunho — foto cobrindo a tela inteira (sem card branco), logo numa caixa escura perto do topo, campos "Login"/"Senha" em pílulas brancas arredondadas flutuando direto sobre a foto. Minha sugestão de gradiente escuro sutil por trás dos campos ainda aguarda aprovação
@@ -31,51 +58,51 @@
 - [x] **Confirmado (18/08): seleção múltipla.** Pode marcar mais de um tipo na mesma OS, com checkbox + chips removíveis (igual ao print do 8Confirma). Isso muda o campo `tipo`: deixa de ser um texto único e vira uma lista — no banco, melhor caminho é uma tabela própria (`os_tipos` ou similar, ligando `ordens_servico` a vários valores de tipo) em vez de tentar guardar array direto num campo texto
 - QR code continua eliminado, não mexer
 
-## 3. Lista de OS — dinâmica e visual (item 2 + item 7/8) ★ maior bloco ✅ implementado 18/08
+## 3. Lista de OS — dinâmica e visual (item 2 + item 7/8) ★ maior bloco
 
-> Redesign completo na lista: contadores, busca/filtros, date range picker (spec), cards ricos e borda colorida por status. Código em `app/screens/ListaOS.js`, `app/components/DateRangeFilter.js` e `app/lib/dateRangeService.js`. Timezone do calendário: `America/Sao_Paulo`.
+> Já feito 18/08 como efeito colateral da migração de tipos (não é o redesign completo, só o mínimo pra lista não quebrar): `App.js` já busca `os_tipos` e mostra os tipos como texto no card, e a borda já fica azul quando `status === 'agendado'`. O resto do item abaixo continua em aberto.
 
-- [x] Resumo com contadores por status (chips coloridos no topo, como no print do 8Confirma)
-- [x] Barra de busca + Filtros + Ordenar + Status (dropdowns)
-- [x] Filtro de período com presets: Hoje, Ontem, Amanhã, Mês Atual, Mês Anterior, Próximo Mês, Personalizado (seguir a spec técnica em `especificacao-date-range-picker.md` à risca: presets calculados dinamicamente, `appliedRange`/`draftRange` separados, sem botão "Aplicar" no personalizado, proteção contra requisição antiga sobrescrever a mais nova)
-- [x] Cards de OS mais ricos: janela de data/hora prevista (início → fim), nome do cliente + razão social embaixo, chip do tipo de manutenção, chip por equipamento com marca/modelo, descrição
-- [x] Status "Agendado" refletido visualmente (chip azul, ícone de calendário)
-- [x] Cor por status na borda de cada card (estender a lógica que já existe pra cobrir todos os status, incluindo "Agendado") + bordas arredondadas nos cards (item 9)
+- [ ] Resumo com contadores por status (chips coloridos no topo, como no print do 8Confirma)
+- [ ] Barra de busca + Filtros + Ordenar + Status (dropdowns)
+- [ ] Filtro de período com presets: Hoje, Ontem, Amanhã, Mês Atual, Mês Anterior, Próximo Mês, Personalizado (seguir a spec técnica em `especificacao-date-range-picker.md` à risca: presets calculados dinamicamente, `appliedRange`/`draftRange` separados, sem botão "Aplicar" no personalizado, proteção contra requisição antiga sobrescrever a mais nova)
+- [ ] Cards de OS mais ricos: janela de data/hora prevista (início → fim), nome do cliente + razão social embaixo, chip do tipo de manutenção, chip por equipamento com marca/modelo, descrição
+- [ ] Status "Agendado" refletido visualmente (chip azul, ícone de calendário)
+- [ ] Cor por status na borda de cada card (estender a lógica que já existe pra cobrir todos os status, incluindo "Agendado") + bordas arredondadas nos cards (item 9)
 
-## 4. Menu hambúrguer (☰) — item 4 ✅ implementado 18/08
+## 4. Menu hambúrguer (☰) — item 4
 
-- [x] Ícone de três barras no canto superior da lista de OS
-- [x] Opção **Criar OS** (tira o botão fixo "+ Nova OS" da tela)
-- [x] Opção **Relatório**: busca cliente → mostra pendências já baixadas (resolvidas) daquele cliente. Pendência aberta não aparece — fica só na OS
-- [x] Opção **Importar clientes** (ver item 5)
-- [x] Opção **Modo escuro/claro**: tema global do app inteiro (confirmado 18/08), o toggle mora aqui no menu
+- [ ] Ícone de três barras no canto superior da lista de OS
+- [ ] Opção **Criar OS** (tira o botão fixo "+ Nova OS" da tela)
+- [ ] Opção **Relatório**: busca cliente → mostra pendências já baixadas (resolvidas) daquele cliente. Pendência aberta não aparece — fica só na OS
+- [ ] Opção **Importar clientes** (ver item 5)
+- [ ] Opção **Modo escuro/claro**: tema global do app inteiro (confirmado 18/08), o toggle mora aqui no menu
 
-## 5. Importar clientes — item 5 ✅ implementado 18/08
+## 5. Importar clientes — item 5
 
-- [x] Tela de "importar arquivo" (reutilizável, dentro do menu ☰)
-- [ ] Carga inicial: os ~50 clientes já extraídos do PDF `Genforce | Clientes` (nome, razão social, endereço) — arquivo ainda não está na pasta do projeto; a tela de importação está pronta pra receber o CSV
-- [x] Seletor de cliente com busca (campo "Procurar...", estilo do 8Confirma) reutilizado onde escolhe cliente (Nova OS, Relatório etc.)
+- [ ] Tela de "importar arquivo" (reutilizável, dentro do menu ☰)
+- [ ] Carga inicial: os ~50 clientes já extraídos do PDF `Genforce | Clientes` (nome, razão social, endereço) — não precisa esperar nada, já tenho os dados
+- [ ] Seletor de cliente com busca (campo "Procurar...", estilo do 8Confirma) reutilizado onde escolhe cliente (Nova OS, Relatório etc.)
 
-## 6. Remanejar OS — item 8 ✅ implementado 18/08
+## 6. Remanejar OS — item 8
 
-- [x] Opção "Remanejar" no menu de três pontos (⋮) de cada OS na lista, junto com "Editar OS" e "Excluir OS" — muda a data sem excluir/recriar
+- [ ] Opção "Remanejar" no menu de três pontos (⋮) de cada OS na lista, junto com "Editar OS" e "Excluir OS" — muda a data sem excluir/recriar
 
-## 7. Tela de login — item 3 ✅ implementado 18/08
+## 7. Tela de login — item 3
 
-- [x] Foto dos geradores (`assets-login/foto-geradores-capa.jpg`, cor natural, sem filtro azulado) cobrindo a tela inteira de fundo
-- [x] Logo `assets-login/genforce-logo-transparente.png` (texto "ENERGIA" recoberto na caixa da logo e substituído por "MANUTENÇÃO" em texto; se a proporção não agradar, volta fácil pra "ENERGIA") dentro de uma caixa escura perto do topo, por cima da foto
-- [x] Campos "Login" e "Senha" em formato de pílula branca arredondada, flutuando direto sobre a foto (sem card/fundo branco atrás)
+> **Testado 19/08 pelo Alexandre — feedback pendente, NÃO mexer até ele mandar o ajuste exato:** não gostou da animação de brilho/pulso no nome "Genforce", nem da cor de fundo preta da caixa da logo (aparecem linhas/faixas nela, "nada a ver com o que queria"). A foto de fundo também vai ser trocada por ele depois. Ver detalhe em `requisitos-app.md`, seção 3 (login).
+
+- [ ] Foto dos geradores (`assets-login/foto-geradores-capa.jpg`, cor natural, sem filtro azulado) cobrindo a tela inteira de fundo
+- [ ] Logo `assets-login/genforce-logo-transparente.png` (com "ENERGIA" recriado como "MANUTENÇÃO", fallback pra "ENERGIA" se não ficar bom) dentro de uma caixa escura perto do topo, por cima da foto
+- [ ] Campos "Login" e "Senha" em formato de pílula branca arredondada, flutuando direto sobre a foto (sem card/fundo branco atrás)
 - [x] Gradiente escuro sutil da metade pra baixo da foto, pra legibilidade dos campos/botão — **aprovado (18/08)**: "vamos ver como fica, depois qualquer coisa mudamos"
-- [x] Modo escuro/claro é tema global do app — o próprio login deve respeitar isso, mas a capa com foto provavelmente fica igual nos dois modos (a definir quando chegar lá)
-- [x] Animação: Ken Burns sutil no fundo + campos surgindo com fade/slide + brilho/pulso de luz na logo ao abrir (é pra testar, pode trocar depois)
+- [ ] Modo escuro/claro é tema global do app — o próprio login deve respeitar isso, mas a capa com foto provavelmente fica igual nos dois modos (a definir quando chegar lá)
+- [ ] Animação: Ken Burns sutil no fundo + campos surgindo com fade/slide + brilho/pulso de luz na logo ao abrir (é pra testar, pode trocar depois)
 
 ## 8. Tela de detalhe da OS — item 10 (confirmado, baixa prioridade — depois da rodada de teste)
 
-> 18/08: **não implementado de propósito.** Ficou só um `TODO` no topo de `OSDetail.js` pra não esquecer, como combinado.
-
 - [ ] Cabeçalho da tela de detalhe da OS colorido pelo status (mesma lógica de cor do item 9)
 - [ ] Mostrar os técnicos com acesso à OS ("colaboradores")
-- [ ] **Pré-requisito:** cadastrar as outras contas de usuário (5 técnicos + 1 supervisor + 2 admin) antes de fazer sentido mostrar essa lista
+- [ ] **Pré-requisito:** cadastrar as outras contas de usuário (4 técnicos + 3 admin — ver requisitos, seção 5) antes de fazer sentido mostrar essa lista
 
 ## Eliminado do escopo (não implementar) — item 6
 
@@ -87,7 +114,7 @@
 <!-- Coisas que vieram da minha análise comparativa com o 8Confirma mas o Alexandre ainda não
 confirmou que quer — ficam de fora do checklist até ele bater o martelo. Ver detalhes em
 requisitos-app.md, seção "Análise comparativa com o 8Confirma". -->
-- Assinatura digital do cliente (banco já tem a tabela `assinaturas` pronta)
+- Assinatura digital do cliente (banco já tem a tabela `assinaturas` pronta) — **implementada no Prompt 2 (23/08)**; comparativo de desempenho no Dashboard ainda aguarda definição do Alexandre
 - Geração automática de PDF do relatório final + envio por WhatsApp/e-mail
 - Painel web pro supervisor (seção 6b do requisitos — maior gap em aberto)
 - Mapa com localização em tempo real dos técnicos / reatribuir OS / sugestão de técnico mais próximo
