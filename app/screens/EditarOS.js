@@ -7,33 +7,12 @@ import {
   ScrollView,
   StyleSheet,
   Button,
-  Platform,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { TIPOS_OS, STATUS_OS, TEMPLATE_PADRAO_ID } from '../lib/constantes';
 import { useTema } from '../lib/tema';
-
-function avisar(mensagem, titulo = 'Aviso') {
-  if (Platform.OS === 'web') {
-    window.alert(mensagem);
-  } else {
-    Alert.alert(titulo, mensagem);
-  }
-}
-
-function confirmarAcao(mensagem) {
-  if (Platform.OS === 'web') {
-    return Promise.resolve(window.confirm(mensagem));
-  }
-  return new Promise((resolve) => {
-    Alert.alert('Confirmar', mensagem, [
-      { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
-      { text: 'Confirmar', style: 'destructive', onPress: () => resolve(true) },
-    ]);
-  });
-}
+import { avisar, confirmarAcao } from '../lib/avisos';
 
 export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
   const { cores } = useTema();
