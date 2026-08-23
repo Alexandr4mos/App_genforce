@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,21 +7,13 @@ import {
   ScrollView,
   StyleSheet,
   Button,
-  Platform,
-  Alert,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { TIPOS_OS, TEMPLATE_PADRAO_ID } from '../lib/constantes';
 import { useTema } from '../lib/tema';
+import { avisar } from '../lib/avisos';
 import SeletorCliente from '../components/SeletorCliente';
-
-function avisar(mensagem, titulo = 'Aviso') {
-  if (Platform.OS === 'web') {
-    window.alert(mensagem);
-  } else {
-    Alert.alert(titulo, mensagem);
-  }
-}
+import DatePickerCampo from '../components/DatePickerCampo';
 
 export default function NovaOS({ onBack, onCriada }) {
   const { cores } = useTema();
@@ -57,6 +49,8 @@ export default function NovaOS({ onBack, onCriada }) {
   const [salvandoUnidade, setSalvandoUnidade] = useState(false);
 
   const [unidadeSelecionadaInfo, setUnidadeSelecionadaInfo] = useState(null);
+  const unidadesRequestRef = useRef(0);
+  const clienteNomeSelecionado = clientes.find((c) => c.id === clienteId)?.nome || '';
 
   function alternarTipo(valor) {
     setTiposSelecionados((prev) => ({ ...prev, [valor]: !prev[valor] }));
@@ -71,6 +65,7 @@ export default function NovaOS({ onBack, onCriada }) {
     else {
       setUnidades([]);
       setUnidadeId(null);
+      setUnidadeSelecionadaInfo(null);
     }
   }, [clienteId]);
 
@@ -87,15 +82,22 @@ export default function NovaOS({ onBack, onCriada }) {
     setClientes(data || []);
   }
 
-  async function carregarUnidades(idCliente) {
+  async function carregarUnidades(idCliente, { manterSelecao } = {}) {
+    const requestId = ++unidadesRequestRef.current;
     const { data } = await supabase
       .from('unidades')
       .select('id, nome, endereco')
       .eq('cliente_id', idCliente)
       .order('nome');
+
+    // Ignora resposta antiga (race com outro fetch ou com insert de unidade).
+    if (requestId !== unidadesRequestRef.current) return;
+
     setUnidades(data || []);
-    setUnidadeId(null);
-    setUnidadeSelecionadaInfo(null);
+    if (!manterSelecao) {
+      setUnidadeId(null);
+      setUnidadeSelecionadaInfo(null);
+    }
   }
 
   async function carregarEquipamentos(idUnidade) {
@@ -110,6 +112,13 @@ export default function NovaOS({ onBack, onCriada }) {
 
   function alternarSelecao(idEquipamento) {
     setEquipamentosSelecionados((prev) => ({ ...prev, [idEquipamento]: !prev[idEquipamento] }));
+  }
+
+  function abrirFormNovaUnidade() {
+    const primeiraUnidade = unidades.length === 0;
+    setNovaUnidadeNome(primeiraUnidade ? clienteNomeSelecionado : '');
+    setNovaUnidadeEndereco('');
+    setMostrarNovaUnidade(true);
   }
 
   async function cadastrarNovoCliente() {
@@ -139,15 +148,25 @@ export default function NovaOS({ onBack, onCriada }) {
   }
 
   async function cadastrarNovaUnidade() {
+    if (!clienteId) {
+      avisar('Escolha o cliente antes de cadastrar a unidade.', 'Falta informação');
+      return;
+    }
     if (!novaUnidadeNome.trim()) {
       avisar('Informe o nome da unidade.', 'Preencha o campo obrigatório');
       return;
     }
 
     setSalvandoUnidade(true);
+    // Invalida fetches em andamento pra não sobrescrever a lista após o insert.
+    const requestId = ++unidadesRequestRef.current;
     const { data, error } = await supabase
       .from('unidades')
-      .insert({ cliente_id: clienteId, nome: novaUnidadeNome.trim(), endereco: novaUnidadeEndereco.trim() || null })
+      .insert({
+        cliente_id: clienteId,
+        nome: novaUnidadeNome.trim(),
+        endereco: novaUnidadeEndereco.trim() || null,
+      })
       .select('id, nome, endereco')
       .single();
     setSalvandoUnidade(false);
@@ -158,7 +177,12 @@ export default function NovaOS({ onBack, onCriada }) {
       return;
     }
 
-    setUnidades((prev) => [...prev, data].sort((a, b) => a.nome.localeCompare(b.nome)));
+    if (requestId !== unidadesRequestRef.current) return;
+
+    setUnidades((prev) => {
+      const semDuplicata = prev.filter((u) => u.id !== data.id);
+      return [...semDuplicata, data].sort((a, b) => a.nome.localeCompare(b.nome));
+    });
     setUnidadeId(data.id);
     setUnidadeSelecionadaInfo(data);
     setNovaUnidadeNome('');
@@ -229,14 +253,8 @@ export default function NovaOS({ onBack, onCriada }) {
 
     setSalvando(true);
 
-    let dataConvertida = null;
-    if (dataPrevista.trim()) {
-      const partes = dataPrevista.trim().split('/');
-      if (partes.length === 3) {
-        const [dia, mes, ano] = partes;
-        dataConvertida = `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
-      }
-    }
+    // DatePickerCampo já entrega YYYY-MM-DD
+    const dataConvertida = dataPrevista.trim() || null;
 
     const { data: novaOs, error: osError } = await supabase
       .from('ordens_servico')
@@ -376,7 +394,7 @@ export default function NovaOS({ onBack, onCriada }) {
               />
             </View>
           ) : (
-            <TouchableOpacity style={styles.novoEquipamentoBotao} onPress={() => setMostrarNovaUnidade(true)}>
+            <TouchableOpacity style={styles.novoEquipamentoBotao} onPress={abrirFormNovaUnidade}>
               <Text style={styles.novoEquipamentoBotaoTexto}>+ Cadastrar nova unidade</Text>
             </TouchableOpacity>
           )}
@@ -476,12 +494,10 @@ export default function NovaOS({ onBack, onCriada }) {
           </View>
 
           <Text style={[styles.label, { color: cores.texto }]}>Data prevista da manutenção</Text>
-          <TextInput
-            style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
-            placeholder="DD/MM/AAAA"
-            placeholderTextColor={cores.placeholder}
+          <DatePickerCampo
             value={dataPrevista}
-            onChangeText={setDataPrevista}
+            onChange={setDataPrevista}
+            placeholder="Escolher data"
           />
 
           <Text style={[styles.label, { color: cores.texto }]}>Descrição</Text>
