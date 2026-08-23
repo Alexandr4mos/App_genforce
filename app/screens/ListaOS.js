@@ -13,13 +13,10 @@ import { supabase } from '../lib/supabase';
 import { avisar, confirmarAcao } from '../lib/avisos';
 import { STATUS_OS, rotuloTipo, rotuloStatus, corDoStatus } from '../lib/constantes';
 import { useTema } from '../lib/tema';
+import { useFiltroOS } from '../lib/filtroOS';
 import DateRangeFilter from '../components/DateRangeFilter';
 import MenuLateral from '../components/MenuLateral';
-import {
-  criarEstadoInicialFiltroData,
-  formatarJanelaPrevista,
-  limitesConsulta,
-} from '../lib/dateRangeService';
+import { formatarJanelaPrevista, limitesConsulta } from '../lib/dateRangeService';
 
 const OPCOES_ORDENACAO = [
   { valor: 'data_asc', rotulo: 'Data prevista ↑' },
@@ -39,21 +36,30 @@ export default function ListaOS({
   onSair,
 }) {
   const { cores, modoEscuro, alternarTema } = useTema();
+  const { dateFilter, setDateFilter, filtroStatus, setFiltroStatus } = useFiltroOS();
   const [menuAberto, setMenuAberto] = useState(false);
-  const [dateFilter, setDateFilter] = useState(() => criarEstadoInicialFiltroData());
   const [ordens, setOrdens] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [busca, setBusca] = useState('');
   const [ordenacao, setOrdenacao] = useState('data_asc');
-  const [filtroStatus, setFiltroStatus] = useState(null);
   const [dropdownAberto, setDropdownAberto] = useState(null);
   const [menuAbertoId, setMenuAbertoId] = useState(null);
   const queryIdRef = useRef(0);
+  const appliedRangeRef = useRef(dateFilter.appliedRange);
 
   useEffect(() => {
+    appliedRangeRef.current = dateFilter.appliedRange;
     fetchOrdens(dateFilter.appliedRange);
   }, []);
+
+  // Se o período mudou enquanto a tela estava desmontada, recarrega ao remontar.
+  useEffect(() => {
+    if (appliedRangeRef.current !== dateFilter.appliedRange) {
+      appliedRangeRef.current = dateFilter.appliedRange;
+      fetchOrdens(dateFilter.appliedRange);
+    }
+  }, [dateFilter.appliedRange]);
 
   async function fetchOrdens(range) {
     const queryId = ++queryIdRef.current;
@@ -119,8 +125,10 @@ export default function ListaOS({
 
   const ordensVisiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
+    const statusAlvo = filtroStatus ? String(filtroStatus).trim() : null;
     let lista = ordens.filter((os) => {
-      if (filtroStatus && os.status !== filtroStatus) return false;
+      const statusOs = String(os.status || '').trim();
+      if (statusAlvo && statusOs !== statusAlvo) return false;
       if (!termo) return true;
       const tipos = (os.os_tipos || []).map((t) => rotuloTipo(t.tipo)).join(' ');
       const texto = [
@@ -304,7 +312,9 @@ export default function ListaOS({
               { borderColor: corDoStatus(s.valor) },
               filtroStatus === s.valor && { backgroundColor: corDoStatus(s.valor) },
             ]}
-            onPress={() => setFiltroStatus(filtroStatus === s.valor ? null : s.valor)}
+            onPress={() =>
+              setFiltroStatus((atual) => (atual === s.valor ? null : s.valor))
+            }
           >
             <Text
               style={[
@@ -317,6 +327,17 @@ export default function ListaOS({
           </TouchableOpacity>
         ))}
       </View>
+
+      {filtroStatus ? (
+        <TouchableOpacity
+          style={[styles.filtroAtivoBar, { backgroundColor: cores.primarioFundo }]}
+          onPress={() => setFiltroStatus(null)}
+        >
+          <Text style={[styles.filtroAtivoTexto, { color: cores.primarioTexto }]}>
+            Filtrando: {rotuloStatus(filtroStatus)} · toque para limpar
+          </Text>
+        </TouchableOpacity>
+      ) : null}
 
       <TextInput
         style={[
@@ -430,6 +451,7 @@ export default function ListaOS({
         data={ordensVisiveis}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderCard}
+        extraData={{ filtroStatus, busca, ordenacao, cores }}
         onScrollBeginDrag={() => {
           setDropdownAberto(null);
           setMenuAbertoId(null);
@@ -437,7 +459,11 @@ export default function ListaOS({
         ListEmptyComponent={
           loading ? null : (
             <Text style={[styles.vazio, { color: cores.textoSuave }]}>
-              {errorMsg ? '' : 'Nenhum resultado encontrado neste período.'}
+              {errorMsg
+                ? ''
+                : filtroStatus
+                  ? `Nenhuma OS com status "${rotuloStatus(filtroStatus)}" neste período.`
+                  : 'Nenhum resultado encontrado neste período.'}
             </Text>
           )
         }
@@ -464,6 +490,13 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   contadorTexto: { fontSize: 12, fontWeight: '700' },
+  filtroAtivoBar: {
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  filtroAtivoTexto: { fontSize: 13, fontWeight: '600' },
   busca: {
     borderWidth: 1,
     borderColor: '#ccc',
