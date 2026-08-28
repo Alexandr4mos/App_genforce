@@ -26,6 +26,7 @@ export const STATUS_OS = [
   { valor: 'andamento', rotulo: 'Andamento' },
   { valor: 'pausada', rotulo: 'Pausada' },
   { valor: 'concluida', rotulo: 'Concluída' },
+  { valor: 'finalizado', rotulo: 'Finalizado' },
 ];
 
 export function rotuloStatus(valor) {
@@ -41,6 +42,7 @@ export const COR_STATUS = {
   andamento: '#ffb300', // amarelo
   pausada: '#9e9e9e', // cinza
   concluida: '#4caf50', // verde
+  finalizado: '#1565c0', // azul escuro
 };
 
 export function corDoStatus(status) {

@@ -124,7 +124,14 @@ function AppInterno() {
     return (
       <>
         <StatusBar style={modoEscuro ? 'light' : 'dark'} />
-        <Relatorio onBack={() => setMostrandoRelatorio(false)} />
+        <Relatorio
+          userId={session.user.id}
+          onBack={() => setMostrandoRelatorio(false)}
+          onAbrirOS={(id) => {
+            setMostrandoRelatorio(false);
+            setOsSelecionadaId(id);
+          }}
+        />
       </>
     );
   }

@@ -31,6 +31,17 @@
 > - [x] Ajuste 8: chips de status com `extraData`, update funcional e barra "Filtrando…"
 > - [x] Ajuste 9: check-in bloqueado em OS `concluida`/`finalizado`
 
+> ## ✅ PROMPT 3 — Finalização, relatórios, cadastros, dashboard (27/08/2026)
+>
+> - [x] Parte 1: cadastros completos de cliente (CNPJ, telefone, e-mail, cidade, UF) e equipamento (campos técnicos + `equipamento_filtros`); tela **Editar cliente** no menu ☰
+> - [x] Parte 2: seção **Peças trocadas** em `OSDetail` (`relatorio_pecas`), sugestão de código via filtros cadastrados, vínculo com pendência na baixa
+> - [x] Parte 3: página **Relatórios** expandida — filtros por seleção, aba busca OS, histórico de pendências resolvidas mantido
+> - [x] Parte 4: fila **Aguardando revisão** (só admin/supervisor), finalizar → `finalizado` + PDF manual (`lib/relatorioPdf.js`); solicitar correção → `andamento` + `observacao_correcao` em destaque
+> - [x] Parte 5: tela **Desempenho** (Dashboard) — contagem de assinaturas `tipo=tecnico` por `usuario_id`; migration `migracao-02-assinaturas-usuario.sql`
+> - [x] Parte 6: redesenho **Detalhe da OS** — cabeçalho colorido, barras de progresso, card resumo, botões Check-In / Informações / Cliente, árvore por equipamento
+> - [x] Parte 7: toggle **modo escuro/claro** no menu ☰ (já estava em `ListaOS.js` desde Prompt 2)
+> - [ ] Envio automático de PDF por e-mail — **aguarda** escolha de provedor (Resend/SendGrid) pelo Alexandre
+
 ## Antes de começar — pontos a confirmar (evitam retrabalho)
 
 - [x] **Login (item 3):** ✅ respondido 18/08 com rascunho — foto cobrindo a tela inteira (sem card branco), logo numa caixa escura perto do topo, campos "Login"/"Senha" em pílulas brancas arredondadas flutuando direto sobre a foto. Minha sugestão de gradiente escuro sutil por trás dos campos ainda aguarda aprovação
