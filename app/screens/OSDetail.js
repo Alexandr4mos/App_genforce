@@ -11,13 +11,19 @@ import {
   Button,
   Image,
   Platform,
+  Modal,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { useTema } from '../lib/tema';
 import { avisar, confirmarAcao } from '../lib/avisos';
+import { corDoStatus, rotuloStatus, rotuloTipo } from '../lib/constantes';
+import { formatarJanelaPrevista } from '../lib/dateRangeService';
+import { abrirRelatorioParaImpressao } from '../lib/relatorioPdf';
 import AssinaturaCampo from '../components/AssinaturaCampo';
 import SecaoChecklist from '../components/SecaoChecklist';
+import SecaoPecasTrocadas from '../components/SecaoPecasTrocadas';
+import SecaoColapsavel from '../components/SecaoColapsavel';
 
 // Chave composta: cada resposta pertence a um gerador (os_equipamento) + item específico.
 // Usar só o id do item causava "vazamento" de resposta entre GMG 01 e GMG 02 quando
@@ -38,6 +44,32 @@ function agruparItensPorGrupo(itens) {
     mapa.get(nome).push(item);
   });
   return grupos.map((nome) => ({ nome, itens: mapa.get(nome) }));
+}
+
+function calcularProgresso(eqs, resps, soObrigatorios = false) {
+  let total = 0;
+  let feitos = 0;
+  (eqs || []).forEach((eq) => {
+    (eq.itens || []).forEach((item) => {
+      if (soObrigatorios && item.obrigatorio === false) return;
+      total += 1;
+      const v = resps[chave(eq.id, item.id)];
+      if (v != null && String(v).trim() !== '') feitos += 1;
+    });
+  });
+  return { feitos, total, pct: total ? Math.round((feitos / total) * 100) : 0 };
+}
+
+function iconeStatus(status) {
+  const mapa = {
+    agendado: '📅',
+    pendente: '⏳',
+    andamento: '🔧',
+    pausada: '⏸',
+    concluida: '✓',
+    finalizado: '✔',
+  };
+  return mapa[status] || '•';
 }
 
 function osConcluida(status) {
@@ -79,6 +111,17 @@ export default function OSDetail({ osId, userId, onBack }) {
   const [assinaturaCliente, setAssinaturaCliente] = useState(null);
   const [assinaturaTecnico, setAssinaturaTecnico] = useState(null);
   const [ultimoErroSalvar, setUltimoErroSalvar] = useState(null);
+  const [pecasPorEquipamento, setPecasPorEquipamento] = useState({});
+  const [historicoPecasPorEquipamento, setHistoricoPecasPorEquipamento] = useState({});
+  const [filtrosPorEquipamento, setFiltrosPorEquipamento] = useState({});
+  const [preenchimentoPeca, setPreenchimentoPeca] = useState({});
+  const [osTipos, setOsTipos] = useState([]);
+  const [modalVisivel, setModalVisivel] = useState(null);
+  const [equipamentosAbertos, setEquipamentosAbertos] = useState({});
+  const [usuarioPapel, setUsuarioPapel] = useState(null);
+  const [mostrarCorrecao, setMostrarCorrecao] = useState(false);
+  const [textoCorrecao, setTextoCorrecao] = useState('');
+  const [processandoRevisao, setProcessandoRevisao] = useState(false);
 
   const debounceTimers = useRef({});
   const respostasRef = useRef({});
@@ -219,20 +262,34 @@ export default function OSDetail({ osId, userId, onBack }) {
     observacoesRef.current = observacoesIniciais;
 
     const abertas = {};
+    const eqAbertos = {};
     withItens.forEach((eq) => {
+      eqAbertos[eq.id] = true;
       agruparItensPorGrupo(eq.itens).forEach(({ nome }) => {
         abertas[`${eq.id}:${nome}`] = true;
       });
     });
     setSecoesAbertas(abertas);
+    setEquipamentosAbertos(eqAbertos);
 
     const { data: osAtual } = await supabase
       .from('ordens_servico')
       .select(
-        'observacoes_gerais, checkin_em, checkin_lat, checkin_lng, checkout_em, checkout_lat, checkout_lng, status, km_saida, km_retorno, importado'
+        `numero, descricao, observacoes_gerais, observacao_correcao,
+        checkin_em, checkin_lat, checkin_lng, checkout_em, checkout_lat, checkout_lng,
+        status, km_saida, km_retorno, importado,
+        aprovado_supervisor, aprovado_por, aprovado_em, enviado_cliente_em,
+        data_inicio_prevista, data_fim_prevista,
+        clientes(id, nome, razao_social, cnpj, telefone, email, cidade, uf)`
       )
       .eq('id', osId)
       .single();
+
+    const { data: tiposOs } = await supabase.from('os_tipos').select('tipo').eq('os_id', osId);
+    setOsTipos((tiposOs || []).map((t) => t.tipo));
+
+    const { data: usuarioAtual } = await supabase.from('usuarios').select('papel').eq('id', userId).single();
+    setUsuarioPapel(usuarioAtual?.papel || 'tecnico');
     const obsGeral = osAtual?.observacoes_gerais || '';
     setObservacaoGeral(obsGeral);
     observacaoGeralRef.current = obsGeral;
@@ -284,6 +341,46 @@ export default function OSDetail({ osId, userId, onBack }) {
       });
     }
     setFotosPorPendencia(fotosPendenciaIniciais);
+
+    const equipamentoIds = withItens.map((eq) => eq.equipamento_id);
+    const pecasOsMap = {};
+    const historicoMap = {};
+    const filtrosMap = {};
+
+    if (equipamentoIds.length > 0) {
+      const { data: pecasOs } = await supabase
+        .from('relatorio_pecas')
+        .select('*')
+        .eq('os_id', osId)
+        .order('data_hora', { ascending: false });
+
+      (pecasOs || []).forEach((p) => {
+        pecasOsMap[p.equipamento_id] = [...(pecasOsMap[p.equipamento_id] || []), p];
+      });
+
+      const { data: historicoPecas } = await supabase
+        .from('relatorio_pecas')
+        .select('*')
+        .in('equipamento_id', equipamentoIds)
+        .order('data_hora', { ascending: false });
+
+      (historicoPecas || []).forEach((p) => {
+        historicoMap[p.equipamento_id] = [...(historicoMap[p.equipamento_id] || []), p];
+      });
+
+      const { data: filtros } = await supabase
+        .from('equipamento_filtros')
+        .select('*')
+        .in('equipamento_id', equipamentoIds);
+
+      (filtros || []).forEach((f) => {
+        filtrosMap[f.equipamento_id] = [...(filtrosMap[f.equipamento_id] || []), f];
+      });
+    }
+
+    setPecasPorEquipamento(pecasOsMap);
+    setHistoricoPecasPorEquipamento(historicoMap);
+    setFiltrosPorEquipamento(filtrosMap);
 
     recomputarRelatorioSalvo({
       resps: respostasIniciais,
@@ -793,6 +890,30 @@ export default function OSDetail({ osId, userId, onBack }) {
       ),
     }));
     setBaixaTexto((prev) => ({ ...prev, [pendenciaId]: '' }));
+
+    const querRegistrar = await confirmarAcao(
+      'Pendência resolvida. Deseja registrar a peça trocada nesta OS?'
+    );
+    if (querRegistrar) {
+      setPreenchimentoPeca((prev) => ({
+        ...prev,
+        [equipamentoId]: {
+          peca: atualizada.item_solicitado,
+          pendencia_id: pendenciaId,
+        },
+      }));
+    }
+  }
+
+  function aoRegistrarPeca(equipamentoId, peca) {
+    setPecasPorEquipamento((prev) => ({
+      ...prev,
+      [equipamentoId]: [peca, ...(prev[equipamentoId] || [])],
+    }));
+    setHistoricoPecasPorEquipamento((prev) => ({
+      ...prev,
+      [equipamentoId]: [peca, ...(prev[equipamentoId] || [])],
+    }));
   }
 
   async function enviarFotoParaPendencia(pendenciaId, uri) {
@@ -948,26 +1069,30 @@ export default function OSDetail({ osId, userId, onBack }) {
 
       let salva;
       if (existente?.id) {
+        const updatePayload = {
+          nome_responsavel,
+          imagem_url: urlData.publicUrl,
+        };
+        if (tipo === 'tecnico') updatePayload.usuario_id = userId;
         const { data, error } = await supabase
           .from('assinaturas')
-          .update({
-            nome_responsavel,
-            imagem_url: urlData.publicUrl,
-          })
+          .update(updatePayload)
           .eq('id', existente.id)
           .select('*')
           .single();
         if (error) throw error;
         salva = data;
       } else {
+        const payload = {
+          os_id: osId,
+          tipo,
+          nome_responsavel,
+          imagem_url: urlData.publicUrl,
+        };
+        if (tipo === 'tecnico') payload.usuario_id = userId;
         const { data, error } = await supabase
           .from('assinaturas')
-          .insert({
-            os_id: osId,
-            tipo,
-            nome_responsavel,
-            imagem_url: urlData.publicUrl,
-          })
+          .insert(payload)
           .select('*')
           .single();
         if (error) throw error;
@@ -1108,6 +1233,70 @@ export default function OSDetail({ osId, userId, onBack }) {
     } finally {
       setSalvandoRelatorio(false);
     }
+  }
+
+  async function finalizarOS() {
+    setProcessandoRevisao(true);
+    const { error } = await supabase
+      .from('ordens_servico')
+      .update({
+        status: 'finalizado',
+        aprovado_supervisor: true,
+        aprovado_por: userId,
+        aprovado_em: new Date().toISOString(),
+      })
+      .eq('id', osId);
+    setProcessandoRevisao(false);
+
+    if (error) {
+      avisar(error.message, 'Erro ao finalizar');
+      return;
+    }
+
+    setOsInfo((prev) => ({
+      ...prev,
+      status: 'finalizado',
+      aprovado_supervisor: true,
+      aprovado_por: userId,
+      aprovado_em: new Date().toISOString(),
+    }));
+
+    await abrirRelatorioParaImpressao(osId);
+    avisar(
+      'OS finalizada. Use Imprimir / Salvar PDF na janela aberta. Envio automático por e-mail será configurado depois.',
+      'Finalizada'
+    );
+  }
+
+  async function solicitarCorrecao() {
+    if (!textoCorrecao.trim()) {
+      avisar('Descreva o que precisa ser corrigido.', 'Observação obrigatória');
+      return;
+    }
+    setProcessandoRevisao(true);
+    const { error } = await supabase
+      .from('ordens_servico')
+      .update({
+        status: 'andamento',
+        observacao_correcao: textoCorrecao.trim(),
+        aprovado_supervisor: false,
+      })
+      .eq('id', osId);
+    setProcessandoRevisao(false);
+
+    if (error) {
+      avisar(error.message, 'Erro ao devolver OS');
+      return;
+    }
+
+    setOsInfo((prev) => ({
+      ...prev,
+      status: 'andamento',
+      observacao_correcao: textoCorrecao.trim(),
+    }));
+    setMostrarCorrecao(false);
+    setTextoCorrecao('');
+    avisar('OS devolvida ao técnico com observação de correção.', 'Correção solicitada');
   }
 
   function renderItemChecklist(eq, item) {
@@ -1265,21 +1454,134 @@ export default function OSDetail({ osId, userId, onBack }) {
   }
 
   const concluida = osConcluida(osInfo?.status);
+  const privilegiado = usuarioPapel === 'admin' || usuarioPapel === 'supervisor';
+  const corStatus = corDoStatus(osInfo?.status || 'pendente');
+  const progObrig = calcularProgresso(osEquipamentos, respostas, true);
+  const progTodos = calcularProgresso(osEquipamentos, respostas, false);
+  const cliente = osInfo?.clientes;
+
+  function acaoCheckInOut() {
+    if (osInfo?.checkout_em) return;
+    if (osInfo?.checkin_em) {
+      fazerCheckout();
+      return;
+    }
+    if (!concluida) fazerCheckin();
+  }
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: cores.fundo }]}>
-      <TouchableOpacity onPress={onBack} style={styles.backButton}>
-        <Text style={[styles.backText, { color: cores.primario }]}>{'< Voltar'}</Text>
-      </TouchableOpacity>
+      <View style={[styles.cabecalhoStatus, { backgroundColor: corStatus }]}>
+        <View style={styles.cabecalhoTopRow}>
+          <TouchableOpacity onPress={onBack}>
+            <Text style={styles.cabecalhoVoltar}>{'< Voltar'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.atualizarBotao} onPress={atualizarDados} disabled={atualizando}>
+            {atualizando ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.cabecalhoAtualizar}>↻</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.cabecalhoNumero}>OS #{osInfo?.numero ?? '—'}</Text>
+        <View style={styles.statusChip}>
+          <Text style={styles.statusChipTexto}>
+            {iconeStatus(osInfo?.status)} {rotuloStatus(osInfo?.status)}
+          </Text>
+        </View>
+      </View>
 
-      <View style={styles.tituloRow}>
-        <Text style={[styles.title, { color: cores.texto }]}>Detalhe da OS</Text>
-        <TouchableOpacity style={styles.atualizarBotao} onPress={atualizarDados} disabled={atualizando}>
-          {atualizando ? (
-            <ActivityIndicator size="small" color={cores.primario} />
-          ) : (
-            <Text style={[styles.atualizarTexto, { color: cores.primario }]}>↻</Text>
-          )}
+      {osInfo?.observacao_correcao ? (
+        <View style={[styles.correcaoBanner, { backgroundColor: '#fff3e0', borderColor: '#ff9800' }]}>
+          <Text style={styles.correcaoTitulo}>⚠ Correção solicitada pelo supervisor</Text>
+          <Text style={styles.correcaoTexto}>{osInfo.observacao_correcao}</Text>
+        </View>
+      ) : null}
+
+      {osEquipamentos.length > 0 ? (
+        <View style={[styles.progressoCard, { backgroundColor: cores.fundoCard, borderColor: cores.borda }]}>
+          <View style={styles.progressoBlock}>
+            <View style={styles.progressoLabelRow}>
+              <Text style={[styles.progressoTitulo, { color: cores.texto }]}>Atividades Obrigatórias</Text>
+              <Text style={[styles.progressoContagem, { color: cores.textoSecundario }]}>
+                {progObrig.feitos}/{progObrig.total} ({progObrig.pct}%)
+              </Text>
+            </View>
+            <View style={[styles.progressoTrack, { backgroundColor: cores.fundoSecundario }]}>
+              <View style={[styles.progressoFill, { width: `${progObrig.pct}%`, backgroundColor: corStatus }]} />
+            </View>
+          </View>
+          <View style={styles.progressoBlock}>
+            <View style={styles.progressoLabelRow}>
+              <Text style={[styles.progressoTitulo, { color: cores.texto }]}>Todas Atividades</Text>
+              <Text style={[styles.progressoContagem, { color: cores.textoSecundario }]}>
+                {progTodos.feitos}/{progTodos.total} ({progTodos.pct}%)
+              </Text>
+            </View>
+            <View style={[styles.progressoTrack, { backgroundColor: cores.fundoSecundario }]}>
+              <View style={[styles.progressoFill, { width: `${progTodos.pct}%`, backgroundColor: corStatus }]} />
+            </View>
+          </View>
+        </View>
+      ) : null}
+
+      <View style={[styles.resumoCard, { backgroundColor: cores.fundoCard, borderColor: cores.borda }]}>
+        <Text style={[styles.resumoLinha, { color: cores.texto }]}>
+          Equipamentos: {osEquipamentos.length}
+        </Text>
+        {osTipos.length > 0 ? (
+          <View style={styles.tiposRow}>
+            {osTipos.map((t) => (
+              <View key={t} style={[styles.tipoChip, { backgroundColor: cores.chipTipoFundo, borderColor: cores.borda }]}>
+                <Text style={[styles.tipoChipTexto, { color: cores.primarioTexto }]}>{rotuloTipo(t)}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+        <Text style={[styles.resumoLinha, { color: cores.textoSecundario }]}>
+          {formatarJanelaPrevista(osInfo?.data_inicio_prevista, osInfo?.data_fim_prevista) || 'Sem janela prevista'}
+        </Text>
+        {osInfo?.descricao ? (
+          <Text style={[styles.resumoDescricao, { color: cores.texto }]}>{osInfo.descricao}</Text>
+        ) : null}
+      </View>
+
+      <View style={styles.acoesRow}>
+        <TouchableOpacity
+          style={[
+            styles.acaoBotao,
+            { backgroundColor: osInfo?.checkin_em ? '#ff9800' : '#4caf50', borderColor: cores.borda },
+          ]}
+          onPress={acaoCheckInOut}
+          disabled={
+            processandoCheckin ||
+            processandoCheckout ||
+            concluida ||
+            Boolean(osInfo?.checkout_em)
+          }
+        >
+          <Text style={styles.acaoBotaoTexto}>
+            {processandoCheckin || processandoCheckout
+              ? '...'
+              : osInfo?.checkout_em
+                ? 'Encerrada'
+                : osInfo?.checkin_em
+                  ? 'Check-Out'
+                  : 'Check-In'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.acaoBotao, { backgroundColor: cores.fundoSecundario, borderColor: cores.borda }]}
+          onPress={() => setModalVisivel('info')}
+        >
+          <Text style={[styles.acaoBotaoTextoEscuro, { color: cores.texto }]}>Informações</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.acaoBotao, { backgroundColor: cores.fundoSecundario, borderColor: cores.borda }]}
+          onPress={() => setModalVisivel('cliente')}
+        >
+          <Text style={[styles.acaoBotaoTextoEscuro, { color: cores.texto }]}>Cliente</Text>
         </TouchableOpacity>
       </View>
 
@@ -1304,63 +1606,53 @@ export default function OSDetail({ osId, userId, onBack }) {
                 ? 'Salvo'
                 : statusSalvamento === 'erro'
                   ? 'Erro ao salvar — toque para tentar de novo'
-                  : ' '}
+                  : osInfo?.checkin_em
+                    ? `Check-in: ${formatarHorario(osInfo.checkin_em)}`
+                    : ' '}
           </Text>
         </TouchableOpacity>
       ) : null}
 
-      <View
-        style={[
-          styles.checkinSection,
-          { backgroundColor: cores.fundoSecundario, borderColor: cores.borda },
-        ]}
-      >
-        {!osInfo?.checkin_em ? (
-          concluida ? (
-            <Text style={[styles.osConcluidaTexto, { color: cores.erro }]}>
-              Esta OS já está concluída — não é possível reabrir o check-in.
-            </Text>
-          ) : (
+      {!osInfo?.checkout_em && osInfo?.checkin_em ? (
+        <Text style={relatorioSalvo ? styles.relatorioSalvoTexto : styles.relatorioNaoSalvoTexto}>
+          {relatorioSalvo
+            ? '✓ Relatório completo — check-out liberado'
+            : '⚠ Complete checklist, observações e assinaturas para liberar o check-out'}
+        </Text>
+      ) : null}
+
+      {privilegiado && osInfo?.status === 'concluida' ? (
+        <View style={[styles.revisaoBox, { borderColor: cores.borda, backgroundColor: cores.fundoCard }]}>
+          <Text style={[styles.revisaoTitulo, { color: cores.texto }]}>Revisão do supervisor</Text>
+          <View style={styles.revisaoBotoes}>
             <TouchableOpacity
-              style={styles.checkinBotao}
-              onPress={fazerCheckin}
-              disabled={processandoCheckin}
+              style={[styles.revisaoBotao, { backgroundColor: '#1565c0' }]}
+              onPress={finalizarOS}
+              disabled={processandoRevisao}
             >
-              <Text style={styles.checkinBotaoTexto}>
-                {processandoCheckin ? 'Registrando...' : '▶ Check-in (iniciar manutenção)'}
+              <Text style={styles.revisaoBotaoTexto}>
+                {processandoRevisao ? '...' : 'Finalizar e gerar PDF'}
               </Text>
             </TouchableOpacity>
-          )
-        ) : (
-          <>
-            <Text style={[styles.checkinInfoTexto, { color: cores.texto }]}>
-              Check-in: {formatarHorario(osInfo.checkin_em)}
-            </Text>
-            {osInfo?.checkout_em ? (
-              <Text style={[styles.checkinInfoTexto, { color: cores.texto }]}>
-                Check-out: {formatarHorario(osInfo.checkout_em)}
-              </Text>
-            ) : (
-              <TouchableOpacity
-                style={styles.checkoutBotao}
-                onPress={fazerCheckout}
-                disabled={processandoCheckout}
-              >
-                <Text style={styles.checkinBotaoTexto}>
-                  {processandoCheckout ? 'Registrando...' : '■ Check-out (encerrar manutenção)'}
-                </Text>
-              </TouchableOpacity>
-            )}
-            {!osInfo?.checkout_em ? (
-              <Text style={relatorioSalvo ? styles.relatorioSalvoTexto : styles.relatorioNaoSalvoTexto}>
-                {relatorioSalvo
-                  ? '✓ Relatório completo — check-out liberado'
-                  : '⚠ Complete checklist, observações e assinaturas para liberar o check-out'}
-              </Text>
-            ) : null}
-          </>
-        )}
-      </View>
+            <TouchableOpacity
+              style={[styles.revisaoBotao, { backgroundColor: '#ff9800' }]}
+              onPress={() => setMostrarCorrecao(true)}
+              disabled={processandoRevisao}
+            >
+              <Text style={styles.revisaoBotaoTexto}>Solicitar correção</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+
+      {privilegiado && osInfo?.status === 'finalizado' ? (
+        <TouchableOpacity
+          style={[styles.pdfBotao, { backgroundColor: cores.primario }]}
+          onPress={() => abrirRelatorioParaImpressao(osId)}
+        >
+          <Text style={styles.revisaoBotaoTexto}>📄 Baixar / imprimir relatório PDF</Text>
+        </TouchableOpacity>
+      ) : null}
 
       {osEquipamentos.length === 0 ? (
         <Text style={{ color: cores.texto, marginBottom: 12 }}>
@@ -1370,22 +1662,14 @@ export default function OSDetail({ osId, userId, onBack }) {
         </Text>
       ) : null}
 
-      {!osInfo?.checkin_em ? (
-        <View style={styles.avisoCheckinSection}>
-          <Text style={styles.avisoCheckinTexto}>
-            {concluida
-              ? 'Esta OS já está concluída — não é possível reabrir o check-in.'
-              : 'Faça o check-in acima para liberar o preenchimento do relatório.'}
-          </Text>
-        </View>
-      ) : (
-        <>
-          {osEquipamentos.map((eq) => (
-            <View key={eq.id} style={styles.equipamentoBlock}>
-              <Text style={[styles.equipamentoTitle, { color: cores.texto }]}>
-                {eq.equipamentos?.tag} — {eq.equipamentos?.fabricante_gmg}
-              </Text>
-
+      {osEquipamentos.map((eq) => (
+        <SecaoColapsavel
+          key={eq.id}
+          titulo={eq.equipamentos?.tag || 'Gerador'}
+          subtitulo={eq.equipamentos?.fabricante_gmg || 'Sem fabricante informado'}
+          abertoInicial
+        >
+          <View style={styles.equipamentoBlock}>
               <View
                 style={[
                   styles.pendenciasSection,
@@ -1611,6 +1895,22 @@ export default function OSDetail({ osId, userId, onBack }) {
                 )}
               </View>
 
+              <SecaoPecasTrocadas
+                osId={osId}
+                equipamentoId={eq.equipamento_id}
+                userId={userId}
+                pecasOs={pecasPorEquipamento[eq.equipamento_id] || []}
+                historicoPecas={historicoPecasPorEquipamento[eq.equipamento_id] || []}
+                filtrosEquipamento={filtrosPorEquipamento[eq.equipamento_id] || []}
+                pendencias={pendenciasPorEquipamento[eq.equipamento_id] || []}
+                onPecaRegistrada={(peca) => aoRegistrarPeca(eq.equipamento_id, peca)}
+                preenchimentoInicial={preenchimentoPeca[eq.equipamento_id]}
+                onLimparPreenchimento={() =>
+                  setPreenchimentoPeca((prev) => ({ ...prev, [eq.equipamento_id]: null }))
+                }
+                somenteLeitura={concluida}
+              />
+
               {agruparItensPorGrupo(eq.itens).map(({ nome, itens: itensGrupo }) => {
                 const chaveSecao = `${eq.id}:${nome}`;
                 const preenchidos = itensGrupo.filter((item) => {
@@ -1645,18 +1945,17 @@ export default function OSDetail({ osId, userId, onBack }) {
                 );
               })}
             </View>
-          ))}
+        </SecaoColapsavel>
+      ))}
 
+      {osEquipamentos.length > 0 ? (
+        <SecaoColapsavel titulo="Observações Gerais & Assinaturas" abertoInicial>
           <View
             style={[
               styles.observacaoGeralSection,
               { backgroundColor: cores.fundoSecundario, borderColor: cores.borda },
             ]}
           >
-            <Text style={[styles.pendenciasTitulo, { color: cores.texto }]}>
-              Observações Gerais & Assinaturas
-            </Text>
-
             <Text style={[styles.campoRotulo, { color: cores.texto }]}>Observações Gerais *</Text>
             <TextInput
               style={[
@@ -1761,7 +2060,10 @@ export default function OSDetail({ osId, userId, onBack }) {
               onExcluir={() => excluirAssinatura('tecnico')}
             />
           </View>
+        </SecaoColapsavel>
+      ) : null}
 
+      {osEquipamentos.length > 0 ? (
           <TouchableOpacity
             style={[styles.salvarRelatorioBotao, { backgroundColor: cores.primario }]}
             onPress={salvarRelatorioCompleto}
@@ -1771,8 +2073,97 @@ export default function OSDetail({ osId, userId, onBack }) {
               {salvandoRelatorio ? 'Salvando relatório...' : '💾 Salvar Relatório'}
             </Text>
           </TouchableOpacity>
-        </>
-      )}
+      ) : null}
+
+      <Modal visible={modalVisivel === 'info'} transparent animationType="slide" onRequestClose={() => setModalVisivel(null)}>
+        <View style={[styles.modalOverlay, { backgroundColor: cores.overlay }]}>
+          <View style={[styles.modalPainel, { backgroundColor: cores.fundo }]}>
+            <Text style={[styles.modalTitulo, { color: cores.texto }]}>Informações da OS</Text>
+            <Text style={[styles.modalLinha, { color: cores.texto }]}>Nº {osInfo?.numero}</Text>
+            <Text style={[styles.modalLinha, { color: cores.textoSecundario }]}>
+              Status: {rotuloStatus(osInfo?.status)}
+            </Text>
+            <Text style={[styles.modalLinha, { color: cores.textoSecundario }]}>
+              {formatarJanelaPrevista(osInfo?.data_inicio_prevista, osInfo?.data_fim_prevista)}
+            </Text>
+            {osInfo?.checkin_em ? (
+              <Text style={[styles.modalLinha, { color: cores.textoSecundario }]}>
+                Check-in: {formatarHorario(osInfo.checkin_em)}
+              </Text>
+            ) : null}
+            {osInfo?.checkout_em ? (
+              <Text style={[styles.modalLinha, { color: cores.textoSecundario }]}>
+                Check-out: {formatarHorario(osInfo.checkout_em)}
+              </Text>
+            ) : null}
+            {osInfo?.descricao ? (
+              <Text style={[styles.modalLinha, { color: cores.texto }]}>{osInfo.descricao}</Text>
+            ) : null}
+            <TouchableOpacity style={[styles.modalFechar, { backgroundColor: cores.primario }]} onPress={() => setModalVisivel(null)}>
+              <Text style={styles.modalFecharTexto}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={modalVisivel === 'cliente'} transparent animationType="slide" onRequestClose={() => setModalVisivel(null)}>
+        <View style={[styles.modalOverlay, { backgroundColor: cores.overlay }]}>
+          <View style={[styles.modalPainel, { backgroundColor: cores.fundo }]}>
+            <Text style={[styles.modalTitulo, { color: cores.texto }]}>Cliente</Text>
+            {cliente ? (
+              <>
+                <Text style={[styles.modalLinha, { color: cores.texto, fontWeight: '700' }]}>{cliente.nome}</Text>
+                {cliente.razao_social ? (
+                  <Text style={[styles.modalLinha, { color: cores.textoSecundario }]}>{cliente.razao_social}</Text>
+                ) : null}
+                {cliente.cnpj ? <Text style={[styles.modalLinha, { color: cores.textoSecundario }]}>CNPJ: {cliente.cnpj}</Text> : null}
+                {cliente.telefone ? <Text style={[styles.modalLinha, { color: cores.textoSecundario }]}>Tel: {cliente.telefone}</Text> : null}
+                {cliente.email ? <Text style={[styles.modalLinha, { color: cores.textoSecundario }]}>{cliente.email}</Text> : null}
+                {(cliente.cidade || cliente.uf) ? (
+                  <Text style={[styles.modalLinha, { color: cores.textoSecundario }]}>
+                    {[cliente.cidade, cliente.uf].filter(Boolean).join(' / ')}
+                  </Text>
+                ) : null}
+              </>
+            ) : (
+              <Text style={[styles.modalLinha, { color: cores.textoSecundario }]}>Cliente não carregado.</Text>
+            )}
+            <TouchableOpacity style={[styles.modalFechar, { backgroundColor: cores.primario }]} onPress={() => setModalVisivel(null)}>
+              <Text style={styles.modalFecharTexto}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={mostrarCorrecao} transparent animationType="slide" onRequestClose={() => setMostrarCorrecao(false)}>
+        <View style={[styles.modalOverlay, { backgroundColor: cores.overlay }]}>
+          <View style={[styles.modalPainel, { backgroundColor: cores.fundo }]}>
+            <Text style={[styles.modalTitulo, { color: cores.texto }]}>Solicitar correção</Text>
+            <TextInput
+              style={[
+                styles.observacaoInput,
+                { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundo, minHeight: 100 },
+              ]}
+              placeholder="Descreva o que o técnico precisa ajustar..."
+              placeholderTextColor={cores.placeholder}
+              value={textoCorrecao}
+              onChangeText={setTextoCorrecao}
+              multiline
+            />
+            <TouchableOpacity
+              style={[styles.modalFechar, { backgroundColor: '#ff9800' }]}
+              onPress={solicitarCorrecao}
+              disabled={processandoRevisao}
+            >
+              <Text style={styles.modalFecharTexto}>Devolver ao técnico</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setMostrarCorrecao(false)} style={{ alignItems: 'center', marginTop: 8 }}>
+              <Text style={{ color: cores.textoSecundario }}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <View style={{ height: 40 }} />
     </ScrollView>
   );
@@ -2022,6 +2413,66 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avisoCheckinTexto: { color: '#e65100', fontWeight: '600', textAlign: 'center' },
-  relatorioSalvoTexto: { fontSize: 12, color: '#4caf50', marginTop: 8, fontWeight: '600' },
-  relatorioNaoSalvoTexto: { fontSize: 12, color: '#e65100', marginTop: 8, fontWeight: '600' },
+  relatorioSalvoTexto: { fontSize: 12, color: '#4caf50', marginTop: 8, marginBottom: 8, fontWeight: '600' },
+  relatorioNaoSalvoTexto: { fontSize: 12, color: '#e65100', marginTop: 8, marginBottom: 8, fontWeight: '600' },
+  cabecalhoStatus: {
+    marginHorizontal: -20,
+    marginTop: -40,
+    paddingTop: 48,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    marginBottom: 16,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+  },
+  cabecalhoTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  cabecalhoVoltar: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  cabecalhoAtualizar: { color: '#fff', fontSize: 22 },
+  cabecalhoNumero: { color: '#fff', fontSize: 26, fontWeight: 'bold', marginBottom: 8 },
+  statusChip: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  statusChipTexto: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  correcaoBanner: { borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12 },
+  correcaoTitulo: { fontWeight: '700', color: '#e65100', marginBottom: 4 },
+  correcaoTexto: { color: '#333', fontSize: 14 },
+  progressoCard: { borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12 },
+  progressoBlock: { marginBottom: 10 },
+  progressoLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  progressoTitulo: { fontSize: 13, fontWeight: '600' },
+  progressoContagem: { fontSize: 12 },
+  progressoTrack: { height: 8, borderRadius: 4, overflow: 'hidden' },
+  progressoFill: { height: '100%', borderRadius: 4 },
+  resumoCard: { borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12 },
+  resumoLinha: { fontSize: 14, marginBottom: 6 },
+  resumoDescricao: { fontSize: 14, marginTop: 4 },
+  tiposRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  tipoChip: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  tipoChipTexto: { fontSize: 11, fontWeight: '600' },
+  acoesRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  acaoBotao: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  acaoBotaoTexto: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  acaoBotaoTextoEscuro: { fontWeight: '700', fontSize: 13 },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
+  modalPainel: { borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, paddingBottom: 32 },
+  modalTitulo: { fontSize: 20, fontWeight: 'bold', marginBottom: 12 },
+  modalLinha: { fontSize: 14, marginBottom: 8 },
+  modalFechar: { marginTop: 16, borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
+  modalFecharTexto: { color: '#fff', fontWeight: '700' },
+  revisaoBox: { borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12 },
+  revisaoTitulo: { fontSize: 15, fontWeight: '700', marginBottom: 8 },
+  revisaoBotoes: { flexDirection: 'row', gap: 8 },
+  revisaoBotao: { flex: 1, borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
+  revisaoBotaoTexto: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  pdfBotao: { borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginBottom: 12 },
 });
