@@ -8,6 +8,7 @@ import NovaOS from './screens/NovaOS';
 import EditarOS from './screens/EditarOS';
 import ListaOS from './screens/ListaOS';
 import Relatorio from './screens/Relatorio';
+import EditarCliente from './screens/EditarCliente';
 import ImportarClientes from './screens/ImportarClientes';
 import Login from './screens/Login';
 import RemanejarOS from './screens/RemanejarOS';
@@ -34,6 +35,7 @@ function AppInterno() {
   const [criandoOS, setCriandoOS] = useState(false);
   const [osEditandoId, setOsEditandoId] = useState(null);
   const [mostrandoRelatorio, setMostrandoRelatorio] = useState(false);
+  const [mostrandoEditarCliente, setMostrandoEditarCliente] = useState(false);
   const [mostrandoImportar, setMostrandoImportar] = useState(false);
   const [osRemanejandoId, setOsRemanejandoId] = useState(null);
 
@@ -57,6 +59,7 @@ function AppInterno() {
     await supabase.auth.signOut();
     setOsSelecionadaId(null);
     setMostrandoRelatorio(false);
+    setMostrandoEditarCliente(false);
     setMostrandoImportar(false);
     resetFiltros();
   }
@@ -123,6 +126,15 @@ function AppInterno() {
     );
   }
 
+  if (mostrandoEditarCliente) {
+    return (
+      <>
+        <StatusBar style={modoEscuro ? 'light' : 'dark'} />
+        <EditarCliente onBack={() => setMostrandoEditarCliente(false)} />
+      </>
+    );
+  }
+
   if (mostrandoImportar) {
     return (
       <>
@@ -154,6 +166,7 @@ function AppInterno() {
         onEditarOS={setOsEditandoId}
         onRemanejar={setOsRemanejandoId}
         onRelatorio={() => setMostrandoRelatorio(true)}
+        onEditarCliente={() => setMostrandoEditarCliente(true)}
         onImportarClientes={() => setMostrandoImportar(true)}
         onSair={handleLogout}
       />

@@ -14,6 +14,9 @@ import { useTema } from '../lib/tema';
 import { avisar } from '../lib/avisos';
 import SeletorCliente from '../components/SeletorCliente';
 import DatePickerCampo from '../components/DatePickerCampo';
+import FormularioCliente from '../components/FormularioCliente';
+import FormularioEquipamento from '../components/FormularioEquipamento';
+import { cnpjValido, limparNumeros } from '../lib/mascaras';
 
 export default function NovaOS({ onBack, onCriada }) {
   const { cores } = useTema();
@@ -27,11 +30,25 @@ export default function NovaOS({ onBack, onCriada }) {
   const [equipamentosSelecionados, setEquipamentosSelecionados] = useState({});
 
   const [mostrarNovoEquipamento, setMostrarNovoEquipamento] = useState(false);
-  const [novoTag, setNovoTag] = useState('');
-  const [novoFabricante, setNovoFabricante] = useState('');
-  const [novoPotencia, setNovoPotencia] = useState('');
-  const [novoPlacaMotor, setNovoPlacaMotor] = useState('');
-  const [novoPlacaAlternador, setNovoPlacaAlternador] = useState('');
+  const [novoEquipamento, setNovoEquipamento] = useState({
+    tag: '',
+    fabricante_gmg: '',
+    potencia_kva: '',
+    tensao: '',
+    tipo_gmg: '',
+    n_serie_gmg: '',
+    ano_fabricacao: '',
+    fabricante_motor: '',
+    modelo_motor: '',
+    n_serie_motor: '',
+    placa_motor: '',
+    fabricante_alternador: '',
+    modelo_alternador: '',
+    n_serie_alternador: '',
+    placa_alternador: '',
+    data_inicio_contrato: '',
+  });
+  const [novosFiltros, setNovosFiltros] = useState([]);
   const [salvandoEquipamento, setSalvandoEquipamento] = useState(false);
 
   const [tiposSelecionados, setTiposSelecionados] = useState({});
@@ -40,7 +57,14 @@ export default function NovaOS({ onBack, onCriada }) {
   const [salvando, setSalvando] = useState(false);
 
   const [mostrarNovoCliente, setMostrarNovoCliente] = useState(false);
-  const [novoClienteNome, setNovoClienteNome] = useState('');
+  const [novoCliente, setNovoCliente] = useState({
+    nome: '',
+    cnpj: '',
+    telefone: '',
+    email: '',
+    cidade: '',
+    uf: '',
+  });
   const [salvandoCliente, setSalvandoCliente] = useState(false);
 
   const [mostrarNovaUnidade, setMostrarNovaUnidade] = useState(false);
@@ -122,15 +146,33 @@ export default function NovaOS({ onBack, onCriada }) {
   }
 
   async function cadastrarNovoCliente() {
-    if (!novoClienteNome.trim()) {
+    if (!novoCliente.nome.trim()) {
       avisar('Informe o nome do cliente.', 'Preencha o campo obrigatório');
       return;
+    }
+    const cnpjLimpo = limparNumeros(novoCliente.cnpj);
+    if (cnpjLimpo && !cnpjValido(novoCliente.cnpj)) {
+      avisar('CNPJ inválido. Verifique os dígitos.', 'Formato incorreto');
+      return;
+    }
+    if (!novoCliente.email?.trim()) {
+      avisar(
+        'Cliente sem e-mail — o relatório não poderá ser enviado automaticamente.',
+        'E-mail recomendado'
+      );
     }
 
     setSalvandoCliente(true);
     const { data, error } = await supabase
       .from('clientes')
-      .insert({ nome: novoClienteNome.trim() })
+      .insert({
+        nome: novoCliente.nome.trim(),
+        cnpj: novoCliente.cnpj?.trim() || null,
+        telefone: novoCliente.telefone?.trim() || null,
+        email: novoCliente.email?.trim() || null,
+        cidade: novoCliente.cidade?.trim() || null,
+        uf: novoCliente.uf || null,
+      })
       .select('id, nome, razao_social')
       .single();
     setSalvandoCliente(false);
@@ -143,7 +185,7 @@ export default function NovaOS({ onBack, onCriada }) {
 
     setClientes((prev) => [...prev, data].sort((a, b) => a.nome.localeCompare(b.nome)));
     setClienteId(data.id);
-    setNovoClienteNome('');
+    setNovoCliente({ nome: '', cnpj: '', telefone: '', email: '', cidade: '', uf: '' });
     setMostrarNovoCliente(false);
   }
 
@@ -191,8 +233,15 @@ export default function NovaOS({ onBack, onCriada }) {
   }
 
   async function cadastrarNovoEquipamento() {
-    if (!novoTag.trim()) {
+    if (!novoEquipamento.tag.trim()) {
       avisar('Informe a identificação do gerador (ex: GMG 03).', 'Preencha o campo obrigatório');
+      return;
+    }
+
+    const filtrosValidos = novosFiltros.filter((f) => f.numero_peca?.trim());
+    const filtrosInvalidos = novosFiltros.some((f) => !f.numero_peca?.trim());
+    if (filtrosInvalidos) {
+      avisar('Preencha o nº da peça em todos os filtros ou remova a linha vazia.', 'Filtros incompletos');
       return;
     }
 
@@ -202,31 +251,80 @@ export default function NovaOS({ onBack, onCriada }) {
       .from('equipamentos')
       .insert({
         unidade_id: unidadeId,
-        tag: novoTag.trim(),
-        fabricante_gmg: novoFabricante.trim() || null,
-        potencia_kva: novoPotencia ? Number(novoPotencia) : null,
-        placa_motor: novoPlacaMotor.trim() || null,
-        placa_alternador: novoPlacaAlternador.trim() || null,
+        tag: novoEquipamento.tag.trim(),
+        fabricante_gmg: novoEquipamento.fabricante_gmg?.trim() || null,
+        potencia_kva: novoEquipamento.potencia_kva ? Number(novoEquipamento.potencia_kva) : null,
+        tensao: novoEquipamento.tensao?.trim() || null,
+        tipo_gmg: novoEquipamento.tipo_gmg?.trim() || null,
+        n_serie_gmg: novoEquipamento.n_serie_gmg?.trim() || null,
+        ano_fabricacao: novoEquipamento.ano_fabricacao ? Number(novoEquipamento.ano_fabricacao) : null,
+        fabricante_motor: novoEquipamento.fabricante_motor?.trim() || null,
+        modelo_motor: novoEquipamento.modelo_motor?.trim() || null,
+        n_serie_motor: novoEquipamento.n_serie_motor?.trim() || null,
+        placa_motor: novoEquipamento.placa_motor?.trim() || null,
+        fabricante_alternador: novoEquipamento.fabricante_alternador?.trim() || null,
+        modelo_alternador: novoEquipamento.modelo_alternador?.trim() || null,
+        n_serie_alternador: novoEquipamento.n_serie_alternador?.trim() || null,
+        placa_alternador: novoEquipamento.placa_alternador?.trim() || null,
+        data_inicio_contrato: novoEquipamento.data_inicio_contrato?.trim() || null,
       })
       .select('id, tag, fabricante_gmg')
       .single();
 
-    setSalvandoEquipamento(false);
-
     if (error) {
+      setSalvandoEquipamento(false);
       console.log(error);
       avisar(error.message || 'Tente novamente.', 'Erro ao cadastrar gerador');
       return;
     }
 
+    if (filtrosValidos.length > 0) {
+      const linhasFiltros = filtrosValidos.map((f) => ({
+        equipamento_id: data.id,
+        tipo_filtro: f.tipo_filtro,
+        numero_peca: f.numero_peca.trim(),
+        observacao: f.observacao?.trim() || null,
+      }));
+      const { error: erroFiltros } = await supabase.from('equipamento_filtros').insert(linhasFiltros);
+      if (erroFiltros) {
+        setSalvandoEquipamento(false);
+        avisar(erroFiltros.message, 'Gerador salvo, mas filtros não foram gravados');
+        return;
+      }
+    }
+
+    setSalvandoEquipamento(false);
+
     setEquipamentos((prev) => [...prev, data]);
     setEquipamentosSelecionados((prev) => ({ ...prev, [data.id]: true }));
-    setNovoTag('');
-    setNovoFabricante('');
-    setNovoPotencia('');
-    setNovoPlacaMotor('');
-    setNovoPlacaAlternador('');
+    setNovoEquipamento({
+      tag: '',
+      fabricante_gmg: '',
+      potencia_kva: '',
+      tensao: '',
+      tipo_gmg: '',
+      n_serie_gmg: '',
+      ano_fabricacao: '',
+      fabricante_motor: '',
+      modelo_motor: '',
+      n_serie_motor: '',
+      placa_motor: '',
+      fabricante_alternador: '',
+      modelo_alternador: '',
+      n_serie_alternador: '',
+      placa_alternador: '',
+      data_inicio_contrato: '',
+    });
+    setNovosFiltros([]);
     setMostrarNovoEquipamento(false);
+  }
+
+  function alterarNovoCliente(campo, valor) {
+    setNovoCliente((prev) => ({ ...prev, [campo]: valor }));
+  }
+
+  function alterarNovoEquipamento(campo, valor) {
+    setNovoEquipamento((prev) => ({ ...prev, [campo]: valor }));
   }
 
   async function criarOS() {
@@ -327,13 +425,7 @@ export default function NovaOS({ onBack, onCriada }) {
 
       {mostrarNovoCliente ? (
         <View style={styles.novoEquipamentoForm}>
-          <TextInput
-            style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
-            placeholder="Nome do cliente *"
-            placeholderTextColor={cores.placeholder}
-            value={novoClienteNome}
-            onChangeText={setNovoClienteNome}
-          />
+          <FormularioCliente valores={novoCliente} onChange={alterarNovoCliente} />
           <Button
             title={salvandoCliente ? 'Salvando...' : 'Salvar cliente'}
             onPress={cadastrarNovoCliente}
@@ -431,36 +523,11 @@ export default function NovaOS({ onBack, onCriada }) {
 
           {mostrarNovoEquipamento ? (
             <View style={styles.novoEquipamentoForm}>
-              <TextInput
-                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
-                placeholder="Identificação (ex: GMG 03) *"
-                value={novoTag}
-                onChangeText={setNovoTag}
-              />
-              <TextInput
-                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
-                placeholder="Fabricante do GMG"
-                value={novoFabricante}
-                onChangeText={setNovoFabricante}
-              />
-              <TextInput
-                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
-                placeholder="Potência (KVA)"
-                value={novoPotencia}
-                onChangeText={setNovoPotencia}
-                keyboardType="numeric"
-              />
-              <TextInput
-                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
-                placeholder="Placa do motor"
-                value={novoPlacaMotor}
-                onChangeText={setNovoPlacaMotor}
-              />
-              <TextInput
-                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
-                placeholder="Placa do alternador"
-                value={novoPlacaAlternador}
-                onChangeText={setNovoPlacaAlternador}
+              <FormularioEquipamento
+                valores={novoEquipamento}
+                onChange={alterarNovoEquipamento}
+                filtros={novosFiltros}
+                onChangeFiltros={setNovosFiltros}
               />
               <Button
                 title={salvandoEquipamento ? 'Salvando...' : 'Salvar gerador'}

@@ -46,3 +46,19 @@ export const COR_STATUS = {
 export function corDoStatus(status) {
   return COR_STATUS[status] || '#9e9e9e';
 }
+
+export const UFS_BR = [
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG',
+  'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
+];
+
+export const TIPOS_FILTRO = [
+  { valor: 'oleo', rotulo: 'Óleo' },
+  { valor: 'combustivel', rotulo: 'Combustível' },
+  { valor: 'ar', rotulo: 'Ar' },
+  { valor: 'separador', rotulo: 'Separador' },
+];
+
+export function rotuloTipoFiltro(valor) {
+  return TIPOS_FILTRO.find((t) => t.valor === valor)?.rotulo || valor;
+}

@@ -32,6 +32,7 @@ export default function ListaOS({
   onEditarOS,
   onRemanejar,
   onRelatorio,
+  onEditarCliente,
   onImportarClientes,
   onSair,
 }) {
@@ -273,6 +274,7 @@ export default function ListaOS({
         onFechar={() => setMenuAberto(false)}
         itens={[
           { rotulo: 'Criar OS', onPress: onCriarOS },
+          { rotulo: 'Editar cliente', onPress: onEditarCliente },
           { rotulo: 'Relatório', onPress: onRelatorio },
           { rotulo: 'Importar clientes', onPress: onImportarClientes },
           {
