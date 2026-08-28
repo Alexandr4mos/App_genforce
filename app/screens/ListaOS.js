@@ -32,6 +32,7 @@ export default function ListaOS({
   onEditarOS,
   onRemanejar,
   onRelatorio,
+  onDashboard,
   onEditarCliente,
   onImportarClientes,
   onSair,
@@ -276,6 +277,7 @@ export default function ListaOS({
           { rotulo: 'Criar OS', onPress: onCriarOS },
           { rotulo: 'Editar cliente', onPress: onEditarCliente },
           { rotulo: 'Relatório', onPress: onRelatorio },
+          { rotulo: 'Desempenho', onPress: onDashboard },
           { rotulo: 'Importar clientes', onPress: onImportarClientes },
           {
             rotulo: modoEscuro ? 'Modo claro' : 'Modo escuro',
