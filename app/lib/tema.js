@@ -1,4 +1,7 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const CHAVE_TEMA = '@genforce/modo_escuro';
 
 export const TEMAS = {
   claro: {
@@ -43,14 +46,36 @@ const TemaContext = createContext(null);
 
 export function TemaProvider({ children }) {
   const [modoEscuro, setModoEscuro] = useState(false);
+  const [carregado, setCarregado] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(CHAVE_TEMA)
+      .then((valor) => {
+        if (valor === '1') setModoEscuro(true);
+        else if (valor === '0') setModoEscuro(false);
+      })
+      .catch(console.log)
+      .finally(() => setCarregado(true));
+  }, []);
+
+  const alternarTema = () => {
+    setModoEscuro((atual) => {
+      const proximo = !atual;
+      AsyncStorage.setItem(CHAVE_TEMA, proximo ? '1' : '0').catch(console.log);
+      return proximo;
+    });
+  };
+
   const value = useMemo(
     () => ({
       modoEscuro,
+      carregado,
       cores: modoEscuro ? TEMAS.escuro : TEMAS.claro,
-      alternarTema: () => setModoEscuro((v) => !v),
+      alternarTema,
     }),
-    [modoEscuro]
+    [modoEscuro, carregado]
   );
+
   return <TemaContext.Provider value={value}>{children}</TemaContext.Provider>;
 }
 

@@ -273,17 +273,13 @@ export default function ListaOS({
       <MenuLateral
         visivel={menuAberto}
         onFechar={() => setMenuAberto(false)}
+        toggleTema={{ valor: modoEscuro, onAlternar: alternarTema }}
         itens={[
           { rotulo: 'Criar OS', onPress: onCriarOS },
           { rotulo: 'Editar cliente', onPress: onEditarCliente },
           { rotulo: 'Relatório', onPress: onRelatorio },
           { rotulo: 'Desempenho', onPress: onDashboard },
           { rotulo: 'Importar clientes', onPress: onImportarClientes },
-          {
-            rotulo: modoEscuro ? 'Modo claro' : 'Modo escuro',
-            detalhe: modoEscuro ? 'Tema escuro ativo' : 'Tema claro ativo',
-            onPress: alternarTema,
-          },
           { rotulo: 'Sair', onPress: onSair },
         ]}
       />

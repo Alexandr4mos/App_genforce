@@ -39,7 +39,7 @@
 > - [x] Parte 4: fila **Aguardando revisão** (só admin/supervisor), finalizar → `finalizado` + PDF manual (`lib/relatorioPdf.js`); solicitar correção → `andamento` + `observacao_correcao` em destaque
 > - [x] Parte 5: tela **Desempenho** (Dashboard) — contagem de assinaturas `tipo=tecnico` por `usuario_id`; migration `migracao-02-assinaturas-usuario.sql`
 > - [x] Parte 6: redesenho **Detalhe da OS** — cabeçalho colorido, barras de progresso, card resumo, botões Check-In / Informações / Cliente, árvore por equipamento
-> - [x] Parte 7: toggle **modo escuro/claro** no menu ☰ (já estava em `ListaOS.js` desde Prompt 2)
+> - [x] Parte 7: **switch** modo escuro/claro no menu ☰ + persistência em AsyncStorage (`lib/tema.js`)
 > - [ ] Envio automático de PDF por e-mail — **aguarda** escolha de provedor (Resend/SendGrid) pelo Alexandre
 
 ## Antes de começar — pontos a confirmar (evitam retrabalho)
