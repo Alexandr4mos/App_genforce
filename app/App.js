@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from './lib/supabase';
+import { emailAuthDeLogin } from './lib/auth';
 import { TemaProvider, useTema } from './lib/tema';
 import { FiltroOSProvider, useFiltroOS } from './lib/filtroOS';
 import OSDetail from './screens/OSDetail';
@@ -13,6 +14,7 @@ import EditarCliente from './screens/EditarCliente';
 import ImportarClientes from './screens/ImportarClientes';
 import Login from './screens/Login';
 import RemanejarOS from './screens/RemanejarOS';
+import GestaoUsuarios from './screens/GestaoUsuarios';
 
 export default function App() {
   return (
@@ -28,7 +30,7 @@ function AppInterno() {
   const { modoEscuro } = useTema();
   const { resetFiltros } = useFiltroOS();
   const [session, setSession] = useState(null);
-  const [email, setEmail] = useState('');
+  const [usuarioLogin, setUsuarioLogin] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -39,6 +41,7 @@ function AppInterno() {
   const [mostrandoDashboard, setMostrandoDashboard] = useState(false);
   const [mostrandoEditarCliente, setMostrandoEditarCliente] = useState(false);
   const [mostrandoImportar, setMostrandoImportar] = useState(false);
+  const [mostrandoGestaoUsuarios, setMostrandoGestaoUsuarios] = useState(false);
   const [osRemanejandoId, setOsRemanejandoId] = useState(null);
 
   useEffect(() => {
@@ -52,8 +55,40 @@ function AppInterno() {
   async function handleLogin() {
     setLoading(true);
     setErrorMsg('');
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setErrorMsg(error.message);
+    const email = emailAuthDeLogin(usuarioLogin);
+    if (!email) {
+      setErrorMsg('Informe o usuário.');
+      setLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setErrorMsg(error.message);
+      setLoading(false);
+      return;
+    }
+
+    const { data: perfil, error: perfilError } = await supabase
+      .from('usuarios')
+      .select('ativo')
+      .eq('id', data.user.id)
+      .maybeSingle();
+
+    if (perfilError) {
+      await supabase.auth.signOut();
+      setErrorMsg('Não foi possível verificar sua conta. Tente novamente.');
+      setLoading(false);
+      return;
+    }
+
+    if (perfil && perfil.ativo === false) {
+      await supabase.auth.signOut();
+      setErrorMsg('Esta conta está desativada. Entre em contato com um administrador.');
+      setLoading(false);
+      return;
+    }
+
     setLoading(false);
   }
 
@@ -64,6 +99,7 @@ function AppInterno() {
     setMostrandoDashboard(false);
     setMostrandoEditarCliente(false);
     setMostrandoImportar(false);
+    setMostrandoGestaoUsuarios(false);
     resetFiltros();
   }
 
@@ -72,9 +108,9 @@ function AppInterno() {
       <>
         <StatusBar style="light" />
         <Login
-          email={email}
+          usuario={usuarioLogin}
           password={password}
-          onEmail={setEmail}
+          onUsuario={setUsuarioLogin}
           onPassword={setPassword}
           onEntrar={handleLogin}
           loading={loading}
@@ -163,6 +199,18 @@ function AppInterno() {
     );
   }
 
+  if (mostrandoGestaoUsuarios) {
+    return (
+      <>
+        <StatusBar style={modoEscuro ? 'light' : 'dark'} />
+        <GestaoUsuarios
+          userId={session.user.id}
+          onBack={() => setMostrandoGestaoUsuarios(false)}
+        />
+      </>
+    );
+  }
+
   if (osRemanejandoId) {
     return (
       <>
@@ -180,6 +228,7 @@ function AppInterno() {
     <>
       <StatusBar style={modoEscuro ? 'light' : 'dark'} />
       <ListaOS
+        userId={session.user.id}
         onAbrirOS={setOsSelecionadaId}
         onCriarOS={() => setCriandoOS(true)}
         onEditarOS={setOsEditandoId}
@@ -188,6 +237,7 @@ function AppInterno() {
         onDashboard={() => setMostrandoDashboard(true)}
         onEditarCliente={() => setMostrandoEditarCliente(true)}
         onImportarClientes={() => setMostrandoImportar(true)}
+        onGestaoUsuarios={() => setMostrandoGestaoUsuarios(true)}
         onSair={handleLogout}
       />
     </>

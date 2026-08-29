@@ -15,9 +15,9 @@ const FOTO_CAPA = require('../assets-login/foto-geradores-capa.jpg');
 const LOGO = require('../assets-login/genforce-logo-transparente.png');
 
 export default function Login({
-  email,
+  usuario,
   password,
-  onEmail,
+  onUsuario,
   onPassword,
   onEntrar,
   loading,
@@ -90,11 +90,12 @@ export default function Login({
 
         <TextInput
           style={styles.pilula}
-          placeholder="Login"
+          placeholder="Usuário"
           placeholderTextColor="#888"
           autoCapitalize="none"
-          value={email}
-          onChangeText={onEmail}
+          autoCorrect={false}
+          value={usuario}
+          onChangeText={onUsuario}
         />
         <TextInput
           style={styles.pilula}
