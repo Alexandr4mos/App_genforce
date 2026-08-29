@@ -1,5 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+  StyleSheet,
+} from 'react-native';
 import { useTema } from '../lib/tema';
 import {
   DIAS_SEMANA,
@@ -34,7 +42,7 @@ function dateParaDisplay(date) {
 
 /**
  * Seletor de data única. value/onChange no formato YYYY-MM-DD.
- * Toque no campo abre calendário em sheet modal (não sobrepõe o formulário).
+ * Calendário compacto em sheet modal — mês inteiro visível ou com scroll interno.
  */
 export default function DatePickerCampo({ value, onChange, placeholder = 'Escolher data' }) {
   const { cores } = useTema();
@@ -88,9 +96,9 @@ export default function DatePickerCampo({ value, onChange, placeholder = 'Escolh
                 }}
                 style={styles.navBtn}
               >
-                <Text style={{ color: cores.primario, fontSize: 22 }}>‹</Text>
+                <Text style={{ color: cores.primario, fontSize: 20 }}>‹</Text>
               </TouchableOpacity>
-              <Text style={{ color: cores.texto, fontWeight: '700', fontSize: 16 }}>
+              <Text style={{ color: cores.texto, fontWeight: '700', fontSize: 15 }}>
                 {tituloMesAno(anoVisivel, mesVisivel)}
               </Text>
               <TouchableOpacity
@@ -101,60 +109,69 @@ export default function DatePickerCampo({ value, onChange, placeholder = 'Escolh
                 }}
                 style={styles.navBtn}
               >
-                <Text style={{ color: cores.primario, fontSize: 22 }}>›</Text>
+                <Text style={{ color: cores.primario, fontSize: 20 }}>›</Text>
               </TouchableOpacity>
             </View>
 
-            <View style={styles.diasHeader}>
-              {DIAS_SEMANA.map((d) => (
-                <Text key={d} style={[styles.diaHeader, { color: cores.textoSuave }]}>
-                  {d}
-                </Text>
-              ))}
-            </View>
+            <ScrollView style={styles.calendarioScroll} bounces={false} showsVerticalScrollIndicator={false}>
+              <View style={styles.diasHeader}>
+                {DIAS_SEMANA.map((d) => (
+                  <Text key={d} style={[styles.diaHeader, { color: cores.textoSuave }]}>
+                    {d}
+                  </Text>
+                ))}
+              </View>
 
-            <View style={styles.grade}>
-              {dias.map((date) => {
-                const noMes = mesmoMes(date, anoVisivel, mesVisivel);
-                const isSel = selecionado && mesmaData(date, selecionado);
-                return (
-                  <TouchableOpacity
-                    key={dateParaIso(date)}
-                    style={[styles.celula, isSel && { backgroundColor: cores.primario }]}
-                    onPress={() => {
-                      onChange(dateParaIso(date));
-                      setAberto(false);
-                    }}
-                    disabled={!noMes}
-                  >
-                    <Text
-                      style={{
-                        color: !noMes ? cores.textoSuave : isSel ? '#fff' : cores.texto,
-                        fontWeight: isSel ? '700' : '400',
+              <View style={styles.grade}>
+                {dias.map((date) => {
+                  const noMes = mesmoMes(date, anoVisivel, mesVisivel);
+                  const isSel = selecionado && mesmaData(date, selecionado);
+                  return (
+                    <TouchableOpacity
+                      key={dateParaIso(date)}
+                      style={[
+                        styles.celula,
+                        isSel && { backgroundColor: cores.primario },
+                        !noMes && styles.celulaForaMes,
+                      ]}
+                      onPress={() => {
+                        if (!noMes) return;
+                        onChange(dateParaIso(date));
+                        setAberto(false);
                       }}
+                      disabled={!noMes}
                     >
-                      {date.getDate()}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                      <Text
+                        style={{
+                          color: !noMes ? cores.textoSuave : isSel ? '#fff' : cores.texto,
+                          fontWeight: isSel ? '700' : '500',
+                          fontSize: 14,
+                        }}
+                      >
+                        {date.getDate()}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
 
-            {value ? (
-              <TouchableOpacity
-                onPress={() => {
-                  onChange('');
-                  setAberto(false);
-                }}
-                style={styles.limparBtn}
-              >
-                <Text style={{ color: cores.erro, textAlign: 'center' }}>Limpar data</Text>
+            <View style={[styles.rodape, { borderTopColor: cores.borda }]}>
+              {value ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    onChange('');
+                    setAberto(false);
+                  }}
+                  style={styles.rodapeBtn}
+                >
+                  <Text style={{ color: cores.erro, textAlign: 'center', fontWeight: '600' }}>Limpar data</Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity onPress={() => setAberto(false)} style={styles.rodapeBtn}>
+                <Text style={{ color: cores.primario, textAlign: 'center', fontWeight: '600' }}>Fechar</Text>
               </TouchableOpacity>
-            ) : null}
-
-            <TouchableOpacity onPress={() => setAberto(false)} style={styles.fecharBtn}>
-              <Text style={{ color: cores.primario, textAlign: 'center', fontWeight: '600' }}>Fechar</Text>
-            </TouchableOpacity>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -179,9 +196,10 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     borderWidth: 1,
     borderBottomWidth: 0,
-    padding: 16,
-    paddingBottom: 28,
-    maxHeight: '85%',
+    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    maxHeight: '78%',
   },
   puxador: {
     alignSelf: 'center',
@@ -189,26 +207,40 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: '#ccc',
-    marginBottom: 12,
+    marginBottom: 8,
   },
-  sheetTitulo: { fontSize: 16, fontWeight: '700', marginBottom: 12, textAlign: 'center' },
+  sheetTitulo: { fontSize: 15, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
   navMes: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 6,
   },
-  navBtn: { paddingHorizontal: 16, paddingVertical: 4 },
-  diasHeader: { flexDirection: 'row', marginBottom: 4 },
-  diaHeader: { flex: 1, textAlign: 'center', fontSize: 11, textTransform: 'uppercase' },
+  navBtn: { paddingHorizontal: 12, paddingVertical: 2 },
+  calendarioScroll: {
+    maxHeight: 280,
+  },
+  diasHeader: { flexDirection: 'row', marginBottom: 2 },
+  diaHeader: {
+    width: '14.28%',
+    textAlign: 'center',
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
   grade: { flexDirection: 'row', flexWrap: 'wrap' },
   celula: {
     width: '14.28%',
-    aspectRatio: 1,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
+    borderRadius: 6,
   },
-  limparBtn: { marginTop: 12, paddingVertical: 8 },
-  fecharBtn: { marginTop: 8, paddingVertical: 8 },
+  celulaForaMes: { opacity: 0.35 },
+  rodape: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 8,
+    marginTop: 4,
+  },
+  rodapeBtn: { paddingVertical: 10 },
 });
