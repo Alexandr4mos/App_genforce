@@ -176,6 +176,25 @@ export function criarEstadoInicialFiltroRelatorio() {
   };
 }
 
+/** Um único dia — usado pelo calendário de planejamento nos Relatórios. */
+export function criarFiltroDiaUnico(date) {
+  const dia = clonarDia(date);
+  return {
+    mode: 'PRESET',
+    selectedPreset: PRESETS.CUSTOM,
+    referenceDate: hojeNoTimezone(),
+    appliedRange: { start: dia, end: dia },
+    draftRange: { start: dia, end: dia },
+    calendar: {
+      visibleMonth: dia.getMonth(),
+      visibleYear: dia.getFullYear(),
+    },
+    rangeSelectionState: RANGE_SELECTION.COMPLETE,
+    ui: { presetMenuOpen: false, calendarOpen: false },
+    timezone: CALENDAR_TIMEZONE,
+  };
+}
+
 export function rotuloPreset(preset) {
   return PRESET_OPCOES.find((o) => o.valor === preset)?.rotulo || 'Personalizado';
 }

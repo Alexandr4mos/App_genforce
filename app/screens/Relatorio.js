@@ -16,11 +16,20 @@ import {
   rotuloTipo,
   rotuloStatus,
   corDoStatus,
+  statusEfetivo,
 } from '../lib/constantes';
 import SeletorCliente from '../components/SeletorCliente';
 import CalendarioPlanejamento from '../components/CalendarioPlanejamento';
 import DateRangeFilter from '../components/DateRangeFilter';
-import { limitesConsulta, criarEstadoInicialFiltroRelatorio } from '../lib/dateRangeService';
+import {
+  limitesConsulta,
+  criarEstadoInicialFiltroRelatorio,
+  criarFiltroDiaUnico,
+  formatarIsoData,
+  formatarDataCurta,
+  mesmaData,
+  parsearDataOs,
+} from '../lib/dateRangeService';
 
 function formatarDataHora(valor) {
   if (!valor) return '';
@@ -78,6 +87,23 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
     [tiposSelecionados]
   );
 
+  const diaSelecionadoCalendario = useMemo(() => {
+    const range = dateFilter.appliedRange;
+    if (!range?.start || !range?.end) return null;
+    if (mesmaData(range.start, range.end)) return formatarIsoData(range.start);
+    return null;
+  }, [dateFilter.appliedRange]);
+
+  function alternarDiaCalendario(isoDia) {
+    const dia = parsearDataOs(isoDia);
+    if (!dia) return;
+    setDateFilter(criarFiltroDiaUnico(dia));
+  }
+
+  function limparFiltroDiaCalendario() {
+    setDateFilter(criarEstadoInicialFiltroRelatorio());
+  }
+
   useEffect(() => {
     if (aba === 'busca') buscarOS();
     else if (aba === 'revisao' && privilegiado) carregarFilaRevisao();
@@ -120,14 +146,13 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
       let query = supabase
         .from('ordens_servico')
         .select(
-          `id, numero, status, descricao, data_inicio_prevista, data_fim_prevista, checkout_em, criado_em,
+          `id, numero, status, descricao, data_inicio_prevista, data_fim_prevista, checkin_em, checkout_em, criado_em,
           clientes(nome, razao_social), os_tipos(tipo)`
         )
         .in('id', idsTipo)
         .order('numero', { ascending: false });
 
       if (clienteId) query = query.eq('cliente_id', clienteId);
-      if (filtroStatus) query = query.eq('status', filtroStatus);
 
       if (dateFilter.appliedRange?.start) {
         const { inicioIso, fimExclusivoIso } = limitesConsulta(dateFilter.appliedRange);
@@ -143,6 +168,9 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
       }
 
       let lista = data || [];
+      if (filtroStatus) {
+        lista = lista.filter((os) => statusEfetivo(os) === filtroStatus);
+      }
       if (somenteComPendencia && clienteId) {
         const idsComPendencia = await osComPendenciaAberta(clienteId);
         lista = lista.filter((os) => idsComPendencia.has(os.id));
@@ -155,13 +183,12 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
     let query = supabase
       .from('ordens_servico')
       .select(
-        `id, numero, status, descricao, data_inicio_prevista, data_fim_prevista, checkout_em, criado_em,
+        `id, numero, status, descricao, data_inicio_prevista, data_fim_prevista, checkin_em, checkout_em, criado_em,
         clientes(nome, razao_social), os_tipos(tipo)`
       )
       .order('numero', { ascending: false });
 
     if (clienteId) query = query.eq('cliente_id', clienteId);
-    if (filtroStatus) query = query.eq('status', filtroStatus);
 
     if (dateFilter.appliedRange?.start) {
       const { inicioIso, fimExclusivoIso } = limitesConsulta(dateFilter.appliedRange);
@@ -177,6 +204,9 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
     }
 
     let lista = data || [];
+    if (filtroStatus) {
+      lista = lista.filter((os) => statusEfetivo(os) === filtroStatus);
+    }
 
     if (somenteComPendencia && clienteId) {
       const idsComPendencia = await osComPendenciaAberta(clienteId);
@@ -272,16 +302,17 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
   function renderCardOS(os) {
     const tipos = (os.os_tipos || []).map((t) => t.tipo);
     const dataRef = os.checkout_em || os.data_inicio_prevista || os.criado_em;
+    const efetivo = statusEfetivo(os);
     return (
       <TouchableOpacity
         key={os.id}
-        style={[styles.card, { borderColor: corDoStatus(os.status), backgroundColor: cores.fundoCard }]}
+        style={[styles.card, { borderColor: corDoStatus(efetivo), backgroundColor: cores.fundoCard }]}
         onPress={() => onAbrirOS?.(os.id)}
       >
         <View style={styles.cardHeader}>
           <Text style={[styles.cardNumero, { color: cores.texto }]}>OS #{os.numero}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: corDoStatus(os.status) }]}>
-            <Text style={styles.statusBadgeTexto}>{rotuloStatus(os.status)}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: corDoStatus(efetivo) }]}>
+            <Text style={styles.statusBadgeTexto}>{rotuloStatus(efetivo)}</Text>
           </View>
         </View>
         <Text style={[styles.cardCliente, { color: cores.texto }]}>
@@ -317,7 +348,11 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
     filtroStatus ? rotuloStatus(filtroStatus) : null,
     ...(tiposAtivosKey ? tiposAtivosKey.split(',').map(rotuloTipo) : []),
     somenteComPendencia ? 'Com pendência aberta' : null,
-    dateFilter.appliedRange?.start ? 'Período restrito' : null,
+    dateFilter.appliedRange?.start
+      ? mesmaData(dateFilter.appliedRange.start, dateFilter.appliedRange.end)
+        ? formatarDataCurta(dateFilter.appliedRange.start)
+        : 'Período restrito'
+      : null,
   ].filter(Boolean);
 
   return (
@@ -399,7 +434,11 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
               onSelecionar={(c) => setClienteId(c.id)}
             />
           ) : (
-            <CalendarioPlanejamento />
+            <CalendarioPlanejamento
+              diaSelecionado={diaSelecionadoCalendario}
+              onAlternarDia={alternarDiaCalendario}
+              onLimparDia={limparFiltroDiaCalendario}
+            />
           )}
 
           <Text style={[styles.label, { color: cores.texto }]}>Status</Text>
