@@ -2,10 +2,14 @@
 -- MIGRAÇÃO 01 — status "agendado" + múltiplos tipos por OS
 -- Gerado em 18/08/2026
 --
--- COMO RODAR:
+-- ESTADO ATUAL (29/08/2026): JÁ APLICADA no Supabase de produção.
+-- ordens_servico NÃO tem mais a coluna "tipo"; tipos ficam em os_tipos.
+-- Não rode este arquivo de novo em produção — é registro histórico.
+--
+-- COMO RODAR (só em ambiente novo que ainda tenha ordens_servico.tipo):
 -- 1. Entre no Supabase (app.supabase.com) > seu projeto
 -- 2. Menu lateral > SQL Editor > New query
--- 3. Cole TODO este arquivo e clique em "Run"
+-- 3. Cole as seções 1–4 abaixo e clique em "Run"
 -- 4. Depois de rodar, veja o aviso no final sobre as OS antigas
 --    marcadas como "Observação" (não têm tipo novo correspondente)
 -- =========================================================
@@ -26,6 +30,7 @@ create index if not exists idx_os_tipos_os on os_tipos(os_id);
 -- ---------------------------------------------------------
 -- 2) Migrar as OS que você já criou nos testes pra tabela nova,
 --    já convertendo pro nome novo de cada tipo
+--    (requer coluna ordens_servico.tipo — só em banco pré-migração)
 -- ---------------------------------------------------------
 insert into os_tipos (os_id, tipo)
 select id,
@@ -46,13 +51,21 @@ on conflict (os_id, tipo) do nothing;
 -- ---------------------------------------------------------
 
 -- ---------------------------------------------------------
--- 4) A coluna antiga "tipo" em ordens_servico NÃO é mais lida
---    pelo app a partir desta migração. Deixamos ela no banco por
---    segurança (não perde nada), sem apagar automaticamente.
---    Se depois de testar tudo você quiser limpar, rode à parte:
+-- 4) Coluna legada ordens_servico.tipo — REMOVIDA (estado final)
 --
---    alter table ordens_servico drop column tipo;
+--    O app passou a gravar tipos só em os_tipos. A coluna antiga
+--    era NOT NULL; sem ajuste, criar OS nova falhava com:
+--    "null value in column tipo violates not-null constraint".
+--
+--    Evolução aplicada no Supabase de produção (em ordem):
+--      a) alter table ordens_servico alter column tipo drop not null;
+--      b) alter table ordens_servico drop column tipo;
+--
+--    Produção já está no passo (b). Comandos comentados abaixo —
+--    descomente só se reproduzir em ambiente que ainda tenha a coluna.
 -- ---------------------------------------------------------
+-- alter table ordens_servico alter column tipo drop not null;
+-- alter table ordens_servico drop column tipo;
 
 -- ---------------------------------------------------------
 -- AVISO: OS de teste que estavam como "Observação" ficaram com
