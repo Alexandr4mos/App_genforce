@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,7 @@ import {
 } from '../lib/constantes';
 import SeletorCliente from '../components/SeletorCliente';
 import DateRangeFilter from '../components/DateRangeFilter';
-import { limitesConsulta, formatarJanelaPrevista, criarEstadoInicialFiltroData } from '../lib/dateRangeService';
+import { limitesConsulta, criarEstadoInicialFiltroRelatorio } from '../lib/dateRangeService';
 
 function formatarDataHora(valor) {
   if (!valor) return '';
@@ -43,7 +43,7 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
   const [filtroStatus, setFiltroStatus] = useState(null);
   const [tiposSelecionados, setTiposSelecionados] = useState({});
   const [somenteComPendencia, setSomenteComPendencia] = useState(false);
-  const [dateFilter, setDateFilter] = useState(() => criarEstadoInicialFiltroData());
+  const [dateFilter, setDateFilter] = useState(() => criarEstadoInicialFiltroRelatorio());
   const [resultados, setResultados] = useState([]);
   const [filaRevisao, setFilaRevisao] = useState([]);
   const [pendenciasResolvidas, setPendenciasResolvidas] = useState([]);
@@ -67,10 +67,19 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
     if (privilegiado) carregarFilaRevisao();
   }, [privilegiado]);
 
+  const tiposAtivosKey = useMemo(
+    () =>
+      Object.keys(tiposSelecionados)
+        .filter((k) => tiposSelecionados[k])
+        .sort()
+        .join(','),
+    [tiposSelecionados]
+  );
+
   useEffect(() => {
     if (aba === 'busca') buscarOS();
     else if (aba === 'revisao' && privilegiado) carregarFilaRevisao();
-  }, [aba, clienteId, filtroStatus, tiposSelecionados, somenteComPendencia, dateFilter.appliedRange, privilegiado]);
+  }, [aba, clienteId, filtroStatus, tiposAtivosKey, somenteComPendencia, dateFilter.appliedRange, privilegiado]);
 
   useEffect(() => {
     if (clienteId) carregarPendenciasResolvidas(clienteId);
@@ -84,6 +93,63 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
 
   async function buscarOS() {
     setLoading(true);
+
+    const tiposAtivos = tiposAtivosKey ? tiposAtivosKey.split(',') : [];
+
+    if (tiposAtivos.length > 0) {
+      const { data: linhasTipo, error: erroTipos } = await supabase
+        .from('os_tipos')
+        .select('os_id')
+        .in('tipo', tiposAtivos);
+
+      if (erroTipos) {
+        setLoading(false);
+        avisar(erroTipos.message, 'Erro ao filtrar tipos');
+        return;
+      }
+
+      const idsTipo = [...new Set((linhasTipo || []).map((r) => r.os_id))];
+      if (idsTipo.length === 0) {
+        setResultados([]);
+        setLoading(false);
+        return;
+      }
+
+      let query = supabase
+        .from('ordens_servico')
+        .select(
+          `id, numero, status, descricao, data_inicio_prevista, data_fim_prevista, checkout_em, criado_em,
+          clientes(nome, razao_social), os_tipos(tipo)`
+        )
+        .in('id', idsTipo)
+        .order('numero', { ascending: false });
+
+      if (clienteId) query = query.eq('cliente_id', clienteId);
+      if (filtroStatus) query = query.eq('status', filtroStatus);
+
+      if (dateFilter.appliedRange?.start) {
+        const { inicioIso, fimExclusivoIso } = limitesConsulta(dateFilter.appliedRange);
+        query = query.gte('data_inicio_prevista', inicioIso).lt('data_inicio_prevista', fimExclusivoIso);
+      }
+
+      const { data, error } = await query.limit(500);
+      setLoading(false);
+
+      if (error) {
+        avisar(error.message, 'Erro na busca');
+        return;
+      }
+
+      let lista = data || [];
+      if (somenteComPendencia && clienteId) {
+        const idsComPendencia = await osComPendenciaAberta(clienteId);
+        lista = lista.filter((os) => idsComPendencia.has(os.id));
+      }
+
+      setResultados(lista);
+      return;
+    }
+
     let query = supabase
       .from('ordens_servico')
       .select(
@@ -95,11 +161,12 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
     if (clienteId) query = query.eq('cliente_id', clienteId);
     if (filtroStatus) query = query.eq('status', filtroStatus);
 
-    const limites = dateFilter.appliedRange ? limitesConsulta(dateFilter.appliedRange) : null;
-    if (limites?.inicioIso) query = query.gte('data_inicio_prevista', limites.inicioIso);
-    if (limites?.fimExclusivoIso) query = query.lt('data_inicio_prevista', limites.fimExclusivoIso);
+    if (dateFilter.appliedRange?.start) {
+      const { inicioIso, fimExclusivoIso } = limitesConsulta(dateFilter.appliedRange);
+      query = query.gte('data_inicio_prevista', inicioIso).lt('data_inicio_prevista', fimExclusivoIso);
+    }
 
-    const { data, error } = await query.limit(200);
+    const { data, error } = await query.limit(500);
     setLoading(false);
 
     if (error) {
@@ -108,13 +175,6 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
     }
 
     let lista = data || [];
-    const tiposAtivos = Object.keys(tiposSelecionados).filter((t) => tiposSelecionados[t]);
-    if (tiposAtivos.length > 0) {
-      lista = lista.filter((os) => {
-        const tiposOs = (os.os_tipos || []).map((t) => t.tipo);
-        return tiposAtivos.some((t) => tiposOs.includes(t));
-      });
-    }
 
     if (somenteComPendencia && clienteId) {
       const idsComPendencia = await osComPendenciaAberta(clienteId);
@@ -245,6 +305,18 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
 
   const clienteAtual = clientes.find((c) => c.id === clienteId);
   const listaAtual = aba === 'revisao' ? filaRevisao : resultados;
+  const temFiltroAtivo =
+    filtroStatus ||
+    tiposAtivosKey ||
+    somenteComPendencia ||
+    dateFilter.appliedRange?.start;
+
+  const rotulosFiltro = [
+    filtroStatus ? rotuloStatus(filtroStatus) : null,
+    ...(tiposAtivosKey ? tiposAtivosKey.split(',').map(rotuloTipo) : []),
+    somenteComPendencia ? 'Com pendência aberta' : null,
+    dateFilter.appliedRange?.start ? 'Período restrito' : null,
+  ].filter(Boolean);
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: cores.fundo }]}>
@@ -341,8 +413,18 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
           <DateRangeFilter
             estado={dateFilter}
             onEstado={setDateFilter}
-            onPeriodoAplicado={(range) => setDateFilter((prev) => ({ ...prev, appliedRange: range }))}
+            onPeriodoAplicado={(range) =>
+              setDateFilter((prev) => ({ ...prev, appliedRange: range }))
+            }
           />
+
+          {temFiltroAtivo ? (
+            <View style={[styles.filtroAtivoBar, { backgroundColor: cores.primarioFundo }]}>
+              <Text style={[styles.filtroAtivoTexto, { color: cores.primarioTexto }]}>
+                Filtrando: {rotulosFiltro.join(' · ')} — {resultados.length} OS
+              </Text>
+            </View>
+          ) : null}
         </>
       ) : (
         <Text style={[styles.subtitulo, { color: cores.textoSecundario }]}>
@@ -419,4 +501,6 @@ const styles = StyleSheet.create({
   tipoChip: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
   tipoChipTexto: { fontSize: 10, fontWeight: '600' },
   cardData: { fontSize: 12 },
+  filtroAtivoBar: { borderRadius: 8, padding: 10, marginBottom: 12 },
+  filtroAtivoTexto: { fontSize: 13, fontWeight: '600' },
 });

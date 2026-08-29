@@ -98,6 +98,20 @@ export default function DateRangeFilter({ estado, onEstado, onPeriodoAplicado })
   }
 
   function aplicarPreset(preset) {
+    if (preset === PRESETS.ALL) {
+      const proximo = {
+        ...estado,
+        mode: 'PRESET',
+        selectedPreset: PRESETS.ALL,
+        appliedRange: null,
+        draftRange: { start: null, end: null },
+        rangeSelectionState: RANGE_SELECTION.IDLE,
+        ui: { presetMenuOpen: false, calendarOpen: false },
+      };
+      onEstado(proximo);
+      onPeriodoAplicado(null);
+      return;
+    }
     if (preset === PRESETS.CUSTOM) {
       abrirCalendarioPersonalizado();
       return;

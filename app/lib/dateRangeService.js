@@ -4,6 +4,7 @@
 export const CALENDAR_TIMEZONE = 'America/Sao_Paulo';
 
 export const PRESETS = {
+  ALL: 'ALL',
   TODAY: 'TODAY',
   YESTERDAY: 'YESTERDAY',
   TOMORROW: 'TOMORROW',
@@ -14,6 +15,7 @@ export const PRESETS = {
 };
 
 export const PRESET_OPCOES = [
+  { valor: PRESETS.ALL, rotulo: 'Todos os períodos' },
   { valor: PRESETS.TODAY, rotulo: 'Hoje' },
   { valor: PRESETS.YESTERDAY, rotulo: 'Ontem' },
   { valor: PRESETS.TOMORROW, rotulo: 'Amanhã' },
@@ -155,6 +157,25 @@ export function criarEstadoInicialFiltroData() {
   };
 }
 
+/** Relatórios: sem filtro de data por padrão — busca histórico completo até o usuário restringir. */
+export function criarEstadoInicialFiltroRelatorio() {
+  const referenceDate = hojeNoTimezone();
+  return {
+    mode: 'PRESET',
+    selectedPreset: PRESETS.ALL,
+    referenceDate,
+    appliedRange: null,
+    draftRange: { start: null, end: null },
+    calendar: {
+      visibleMonth: referenceDate.getMonth(),
+      visibleYear: referenceDate.getFullYear(),
+    },
+    rangeSelectionState: RANGE_SELECTION.IDLE,
+    ui: { presetMenuOpen: false, calendarOpen: false },
+    timezone: CALENDAR_TIMEZONE,
+  };
+}
+
 export function rotuloPreset(preset) {
   return PRESET_OPCOES.find((o) => o.valor === preset)?.rotulo || 'Personalizado';
 }
@@ -167,8 +188,11 @@ export function formatarDataCurta(date) {
 
 export function rotuloGatilho(selectedPreset, appliedRange) {
   const titulo = rotuloPreset(selectedPreset);
-  if (!appliedRange?.start) {
-    return { titulo, subtitulo: '' };
+  if (selectedPreset === PRESETS.ALL || !appliedRange?.start) {
+    return {
+      titulo,
+      subtitulo: selectedPreset === PRESETS.ALL ? 'Sem filtro de data' : '',
+    };
   }
   if (!mesmaData(appliedRange.start, appliedRange.end)) {
     return {

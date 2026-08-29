@@ -69,16 +69,20 @@ export default function ListaOS({
     setErrorMsg('');
     setOrdens([]);
 
-    const { inicioIso, fimExclusivoIso } = limitesConsulta(range);
-
-    const { data, error } = await supabase
+    let query = supabase
       .from('ordens_servico')
       .select(
         'id, numero, status, descricao, data_inicio_prevista, data_fim_prevista, checkin_em, checkout_em, clientes(nome, razao_social), os_tipos(tipo), os_equipamentos(equipamentos(tag, fabricante_gmg))'
-      )
-      .gte('data_inicio_prevista', inicioIso)
-      .lt('data_inicio_prevista', fimExclusivoIso)
-      .order('data_inicio_prevista', { ascending: true });
+      );
+
+    if (range?.start && range?.end) {
+      const { inicioIso, fimExclusivoIso } = limitesConsulta(range);
+      query = query
+        .gte('data_inicio_prevista', inicioIso)
+        .lt('data_inicio_prevista', fimExclusivoIso);
+    }
+
+    const { data, error } = await query.order('data_inicio_prevista', { ascending: true });
 
     if (queryId !== queryIdRef.current) return;
 

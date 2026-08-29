@@ -145,7 +145,11 @@ export default function FormularioEquipamento({ valores, onChange, filtros, onCh
 
       <SecaoColapsavel titulo="Contrato e filtros">
         <Text style={[styles.labelData, { color: cores.texto }]}>Início do contrato de manutenção</Text>
-        <DatePickerCampo valor={valores.data_inicio_contrato || ''} onChange={(v) => onChange('data_inicio_contrato', v)} />
+        <DatePickerCampo
+          value={valores.data_inicio_contrato || ''}
+          onChange={(v) => onChange('data_inicio_contrato', v)}
+          placeholder="Toque para escolher a data"
+        />
 
         <Text style={[styles.subtituloFiltros, { color: cores.texto }]}>Numeração dos filtros</Text>
         {(filtros || []).map((filtro, indice) => (

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, Text, TouchableOpacity, View, StyleSheet, Platform } from 'react-native';
+import { Modal, Pressable, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { useTema } from '../lib/tema';
 import {
   DIAS_SEMANA,
@@ -34,6 +34,7 @@ function dateParaDisplay(date) {
 
 /**
  * Seletor de data única. value/onChange no formato YYYY-MM-DD.
+ * Toque no campo abre calendário em sheet modal (não sobrepõe o formulário).
  */
 export default function DatePickerCampo({ value, onChange, placeholder = 'Escolher data' }) {
   const { cores } = useTema();
@@ -51,51 +52,33 @@ export default function DatePickerCampo({ value, onChange, placeholder = 'Escolh
     setAberto(true);
   }
 
-  if (Platform.OS === 'web') {
-    return (
-      <View
-        style={[
-          styles.wrap,
-          { borderColor: cores.bordaInput, backgroundColor: cores.fundoCard },
-        ]}
-      >
-        <input
-          type="date"
-          value={value || ''}
-          onChange={(e) => onChange(e.target.value || '')}
-          style={{
-            border: 'none',
-            outline: 'none',
-            background: 'transparent',
-            color: cores.texto,
-            fontSize: 16,
-            padding: 10,
-            width: '100%',
-            fontFamily: 'inherit',
-            boxSizing: 'border-box',
-          }}
-        />
-      </View>
-    );
-  }
-
   return (
     <>
       <TouchableOpacity
         style={[styles.wrap, { borderColor: cores.bordaInput, backgroundColor: cores.fundoCard }]}
         onPress={abrir}
+        activeOpacity={0.8}
       >
-        <Text style={{ color: value ? cores.texto : cores.placeholder, fontSize: 16, padding: 10 }}>
+        <Text style={{ color: value ? cores.texto : cores.placeholder, fontSize: 16 }}>
           {selecionado ? dateParaDisplay(selecionado) : placeholder}
         </Text>
       </TouchableOpacity>
 
-      <Modal visible={aberto} transparent animationType="fade" onRequestClose={() => setAberto(false)}>
-        <Pressable style={styles.overlay} onPress={() => setAberto(false)}>
+      <Modal
+        visible={aberto}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAberto(false)}
+        statusBarTranslucent
+      >
+        <Pressable style={[styles.overlay, { backgroundColor: cores.overlay }]} onPress={() => setAberto(false)}>
           <Pressable
-            style={[styles.modal, { backgroundColor: cores.fundoCard, borderColor: cores.borda }]}
+            style={[styles.sheet, { backgroundColor: cores.fundoCard, borderColor: cores.borda }]}
             onPress={(e) => e.stopPropagation?.()}
           >
+            <View style={styles.puxador} />
+            <Text style={[styles.sheetTitulo, { color: cores.texto }]}>{placeholder}</Text>
+
             <View style={styles.navMes}>
               <TouchableOpacity
                 onPress={() => {
@@ -105,9 +88,9 @@ export default function DatePickerCampo({ value, onChange, placeholder = 'Escolh
                 }}
                 style={styles.navBtn}
               >
-                <Text style={{ color: cores.primario, fontSize: 18 }}>‹</Text>
+                <Text style={{ color: cores.primario, fontSize: 22 }}>‹</Text>
               </TouchableOpacity>
-              <Text style={{ color: cores.texto, fontWeight: '700' }}>
+              <Text style={{ color: cores.texto, fontWeight: '700', fontSize: 16 }}>
                 {tituloMesAno(anoVisivel, mesVisivel)}
               </Text>
               <TouchableOpacity
@@ -118,7 +101,7 @@ export default function DatePickerCampo({ value, onChange, placeholder = 'Escolh
                 }}
                 style={styles.navBtn}
               >
-                <Text style={{ color: cores.primario, fontSize: 18 }}>›</Text>
+                <Text style={{ color: cores.primario, fontSize: 22 }}>›</Text>
               </TouchableOpacity>
             </View>
 
@@ -157,8 +140,20 @@ export default function DatePickerCampo({ value, onChange, placeholder = 'Escolh
               })}
             </View>
 
-            <TouchableOpacity onPress={() => setAberto(false)} style={{ marginTop: 12 }}>
-              <Text style={{ color: cores.primario, textAlign: 'center' }}>Fechar</Text>
+            {value ? (
+              <TouchableOpacity
+                onPress={() => {
+                  onChange('');
+                  setAberto(false);
+                }}
+                style={styles.limparBtn}
+              >
+                <Text style={{ color: cores.erro, textAlign: 'center' }}>Limpar data</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            <TouchableOpacity onPress={() => setAberto(false)} style={styles.fecharBtn}>
+              <Text style={{ color: cores.primario, textAlign: 'center', fontWeight: '600' }}>Fechar</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -172,26 +167,38 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     marginBottom: 10,
-    overflow: 'hidden',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'center',
-    padding: 24,
+    justifyContent: 'flex-end',
   },
-  modal: {
-    borderRadius: 12,
+  sheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     borderWidth: 1,
+    borderBottomWidth: 0,
     padding: 16,
+    paddingBottom: 28,
+    maxHeight: '85%',
   },
+  puxador: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#ccc',
+    marginBottom: 12,
+  },
+  sheetTitulo: { fontSize: 16, fontWeight: '700', marginBottom: 12, textAlign: 'center' },
   navMes: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  navBtn: { paddingHorizontal: 12, paddingVertical: 4 },
+  navBtn: { paddingHorizontal: 16, paddingVertical: 4 },
   diasHeader: { flexDirection: 'row', marginBottom: 4 },
   diaHeader: { flex: 1, textAlign: 'center', fontSize: 11, textTransform: 'uppercase' },
   grade: { flexDirection: 'row', flexWrap: 'wrap' },
@@ -202,4 +209,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 8,
   },
+  limparBtn: { marginTop: 12, paddingVertical: 8 },
+  fecharBtn: { marginTop: 8, paddingVertical: 8 },
 });
