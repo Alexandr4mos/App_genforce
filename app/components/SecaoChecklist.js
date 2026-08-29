@@ -9,12 +9,13 @@ export default function SecaoChecklist({
   aberta,
   onToggle,
   completa,
+  corBordaLateral,
   children,
   onSalvarSecao,
   salvandoSecao,
 }) {
   const { cores } = useTema();
-  const bordaCor = completa ? '#4caf50' : cores.primario;
+  const bordaCor = corBordaLateral ?? (completa ? '#4caf50' : cores.primario);
 
   return (
     <View
