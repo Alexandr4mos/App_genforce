@@ -17,7 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { useTema } from '../lib/tema';
 import { avisar, confirmarAcao } from '../lib/avisos';
-import { corDoStatus, rotuloStatus, rotuloTipo } from '../lib/constantes';
+import { corDoStatus, rotuloStatus, rotuloTipo, statusEfetivo, corBordaGrupoChecklist } from '../lib/constantes';
 import { itemExigeResposta, gruposOpcionaisIniciais } from '../lib/gruposOS';
 import { formatarJanelaPrevista } from '../lib/dateRangeService';
 import { abrirRelatorioParaImpressao } from '../lib/relatorioPdf';
@@ -274,7 +274,7 @@ export default function OSDetail({ osId, userId, onBack }) {
     withItens.forEach((eq) => {
       eqAbertos[eq.id] = true;
       agruparItensPorGrupo(eq.itens).forEach(({ nome }) => {
-        abertas[`${eq.id}:${nome}`] = true;
+        abertas[`${eq.id}:${nome}`] = false;
       });
     });
     setSecoesAbertas(abertas);
@@ -569,6 +569,7 @@ export default function OSDetail({ osId, userId, onBack }) {
   }
 
   async function garantirRespostaSalva(osEquipamentoId, templateItemId, overrides = {}) {
+    if (!osInfo?.checkin_em) return null;
     const k = chave(osEquipamentoId, templateItemId);
     const valor =
       overrides.valor !== undefined ? overrides.valor : respostasRef.current[k];
@@ -629,6 +630,7 @@ export default function OSDetail({ osId, userId, onBack }) {
   }
 
   function selecionarResposta(osEquipamentoId, templateItemId, valor) {
+    if (!osInfo?.checkin_em) return;
     const k = chave(osEquipamentoId, templateItemId);
     setRespostas((prev) => {
       const next = { ...prev, [k]: valor };
@@ -1173,6 +1175,7 @@ export default function OSDetail({ osId, userId, onBack }) {
   }
 
   async function salvarSecao(eq, itensDaSecao, chaveSecao) {
+    if (!osInfo?.checkin_em) return;
     setSalvandoSecao(chaveSecao);
     try {
       for (const item of itensDaSecao) {
@@ -1322,14 +1325,15 @@ export default function OSDetail({ osId, userId, onBack }) {
     avisar('OS devolvida ao técnico com observação de correção.', 'Correção solicitada');
   }
 
-  function renderItemChecklist(eq, item) {
+  function renderItemChecklist(eq, item, editavel = true) {
     const k = chave(eq.id, item.id);
     return (
-      <View key={item.id} style={[styles.itemBlock, { borderColor: cores.borda }]}>
+      <View key={item.id} style={[styles.itemBlock, { borderColor: cores.borda, opacity: editavel ? 1 : 0.55 }]}>
         <Text style={[styles.itemTitulo, { color: cores.texto }]}>{item.titulo}</Text>
 
         {item.tipo_resposta === 'numero' || item.tipo_resposta === 'texto' ? (
           <TextInput
+            editable={editavel}
             style={[
               styles.numeroInput,
               item.tipo_resposta === 'texto' && styles.textoInputLargo,
@@ -1372,7 +1376,8 @@ export default function OSDetail({ osId, userId, onBack }) {
                     { borderColor: cores.bordaInput },
                     selecionado && { backgroundColor: cores.primario, borderColor: cores.primario },
                   ]}
-                  onPress={() => selecionarResposta(eq.id, item.id, opcao)}
+                  onPress={() => editavel && selecionarResposta(eq.id, item.id, opcao)}
+                  disabled={!editavel}
                 >
                   <Text
                     style={
@@ -1390,6 +1395,7 @@ export default function OSDetail({ osId, userId, onBack }) {
         )}
 
         <TextInput
+          editable={editavel}
           style={[
             styles.observacaoInput,
             {
@@ -1478,7 +1484,9 @@ export default function OSDetail({ osId, userId, onBack }) {
 
   const concluida = osConcluida(osInfo?.status);
   const privilegiado = usuarioPapel === 'admin' || usuarioPapel === 'supervisor';
-  const corStatus = corDoStatus(osInfo?.status || 'pendente');
+  const statusOs = statusEfetivo(osInfo);
+  const corStatus = corDoStatus(statusOs);
+  const checklistLiberado = Boolean(osInfo?.checkin_em);
   const progObrig = calcularProgresso(osEquipamentos, respostas, true, gruposOpcionais);
   const progTodos = calcularProgresso(osEquipamentos, respostas, false, gruposOpcionais);
   const cliente = osInfo?.clientes;
@@ -1510,7 +1518,7 @@ export default function OSDetail({ osId, userId, onBack }) {
         <Text style={styles.cabecalhoNumero}>OS #{osInfo?.numero ?? '—'}</Text>
         <View style={styles.statusChip}>
           <Text style={styles.statusChipTexto}>
-            {iconeStatus(osInfo?.status)} {rotuloStatus(osInfo?.status)}
+            {iconeStatus(statusOs)} {rotuloStatus(statusOs)}
           </Text>
         </View>
       </View>
@@ -1934,7 +1942,8 @@ export default function OSDetail({ osId, userId, onBack }) {
                 somenteLeitura={concluida}
               />
 
-              {agruparItensPorGrupo(eq.itens).map(({ nome, itens: itensGrupo }) => {
+              {checklistLiberado ? (
+                agruparItensPorGrupo(eq.itens).map(({ nome, itens: itensGrupo }) => {
                 const chaveSecao = `${eq.id}:${nome}`;
                 const preenchidos = itensGrupo.filter((item) => {
                   const v = respostas[chave(eq.id, item.id)];
@@ -1946,7 +1955,7 @@ export default function OSDetail({ osId, userId, onBack }) {
                   .filter((v) => v != null && String(v).trim() !== '')
                   .slice(0, 4)
                   .join(' | ');
-                const aberta = secoesAbertas[chaveSecao] !== false;
+                const aberta = secoesAbertas[chaveSecao] === true;
 
                 return (
                   <SecaoChecklist
@@ -1957,16 +1966,29 @@ export default function OSDetail({ osId, userId, onBack }) {
                     resumo={resumo}
                     aberta={aberta}
                     completa={completa}
+                    corBordaLateral={corBordaGrupoChecklist(completa, statusOs)}
                     onToggle={() =>
                       setSecoesAbertas((prev) => ({ ...prev, [chaveSecao]: !aberta }))
                     }
                     onSalvarSecao={() => salvarSecao(eq, itensGrupo, chaveSecao)}
                     salvandoSecao={salvandoSecao === chaveSecao}
                   >
-                    {itensGrupo.map((item) => renderItemChecklist(eq, item))}
+                    {itensGrupo.map((item) => renderItemChecklist(eq, item, true))}
                   </SecaoChecklist>
                 );
-              })}
+              })
+              ) : (
+                <View
+                  style={[
+                    styles.checklistBloqueadoBox,
+                    { backgroundColor: cores.fundoSecundario, borderColor: cores.borda },
+                  ]}
+                >
+                  <Text style={[styles.checklistBloqueadoTexto, { color: cores.textoSecundario }]}>
+                    Faça o check-in para liberar o checklist deste equipamento.
+                  </Text>
+                </View>
+              )}
             </View>
         </SecaoColapsavel>
       ))}
@@ -2104,7 +2126,7 @@ export default function OSDetail({ osId, userId, onBack }) {
             <Text style={[styles.modalTitulo, { color: cores.texto }]}>Informações da OS</Text>
             <Text style={[styles.modalLinha, { color: cores.texto }]}>Nº {osInfo?.numero}</Text>
             <Text style={[styles.modalLinha, { color: cores.textoSecundario }]}>
-              Status: {rotuloStatus(osInfo?.status)}
+              Status: {rotuloStatus(statusOs)}
             </Text>
             <Text style={[styles.modalLinha, { color: cores.textoSecundario }]}>
               {formatarJanelaPrevista(osInfo?.data_inicio_prevista, osInfo?.data_fim_prevista)}
@@ -2498,4 +2520,11 @@ const styles = StyleSheet.create({
   revisaoBotao: { flex: 1, borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
   revisaoBotaoTexto: { color: '#fff', fontWeight: '700', fontSize: 13 },
   pdfBotao: { borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginBottom: 12 },
+  checklistBloqueadoBox: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 14,
+    marginBottom: 12,
+  },
+  checklistBloqueadoTexto: { fontSize: 13, textAlign: 'center', fontStyle: 'italic' },
 });
