@@ -37,7 +37,8 @@
 ## 5. Logística dos Funcionários
 - [ ] Check-in/check-out com geolocalização
 - [ ] Distribuição de OS por técnico com visão de agenda do dia
-- [ ] Perfis de acesso: técnico, supervisor, admin (hoje: 5 técnicos, 1 supervisor, 2 admin)
+- [ ] Perfis de acesso: técnico, supervisor, admin
+- **Equipe real confirmada em 22/08 — são 7 pessoas, não 8:** Alexandre Luiz, Valdemar e André Luiz como admin; Marcos, Marcelo, Márcio e Wesley como técnicos. Os três primeiros foram descritos como "admin/supervisor"; como supervisor e admin têm as mesmas permissões no desenho atual, ficaram todos como `admin`. Só o e-mail do Alexandre foi informado; os outros 6 ficam pendentes
 
 ## 6. Clareza para o Cliente
 - [ ] Status da OS em tempo real
@@ -169,6 +170,11 @@ O que aparece na tela de lista de OS do 8Confirma:
 - **Campos de login/senha:** bordas arredondadas — confirmado
 - **Animação confirmada (17/08):** as duas juntas — efeito Ken Burns sutil (zoom lento) na foto de fundo + campos de login surgindo com fade/slide de baixo pra cima, **e** um brilho/pulso de luz atravessando a logo ao abrir (como se "ligasse"). Combinado que é só pra testar — se não ficar legal na prática, a gente troca depois
 - **Confirmado (18/08): a animação se mantém igual**, mesmo depois de ajustar o entendimento do layout (foto cheia + caixa da logo + campos flutuantes). A correção foi só sobre a estrutura visual (onde fica cada elemento), não sobre a animação
+- **Testado no navegador (19/08) — feedback do Alexandre, AINDA NÃO IMPLEMENTAR:**
+  - Não gostou da animação de brilho/pulso passando no nome "Genforce" (o efeito "como se ligasse") — pediu pra mudar
+  - Não gostou da cor de fundo da caixa da logo: hoje está preta e aparecem linhas/faixas nela (parece artefato de gradiente, não um preto sólido) — "nada a ver com o que eu queria"
+  - A foto de fundo (geradores) vai ser trocada por ele depois — não é prioridade mexer nela agora
+  - Ele vai mandar os ajustes específicos em mensagens separadas — **só implementar quando ele mandar o ajuste concreto**, por enquanto é só registrar
 
 **4. Menu hambúrguer (☰) na lista de OS: navegação + Relatório + Criar OS**
 - Depois do login, na tela de lista de OS, adicionar um ícone de três barras (☰) no canto superior — abre um menu com as funções/telas do app (tipo configurações/navegação)
@@ -239,7 +245,66 @@ O que aparece na tela de lista de OS do 8Confirma:
 **10. Tela de detalhe da OS: cabeçalho colorido por status + lista de técnicos com acesso (18/08, confirmado mas de baixa prioridade agora)**
 - Confirmado: quer o cabeçalho da tela de detalhe da OS colorido pelo status também (igual o vídeo mostrou — verde quando concluída, etc.), mesma lógica de cor do item 9
 - Confirmado: quer mostrar os técnicos que têm acesso àquela OS (como "colaboradores" no vídeo)
-- **Pré-requisito:** pra isso funcionar direito, precisa primeiro cadastrar as outras contas de usuário no sistema (hoje provavelmente só a conta do Alexandre existe) — a equipe é 5 técnicos + 1 supervisor + 2 admin, já mapeado lá na seção 5 do requisitos, mas ainda não foi feito
+- **Pré-requisito:** pra isso funcionar direito, precisa primeiro cadastrar as outras contas de usuário no sistema (hoje provavelmente só a conta do Alexandre existe) — a equipe é 4 técnicos + 3 admin (ver seção 5), mas só a conta do Alexandre vai ser criada de início
 - **Combinado:** isso fica pra mais pra frente. Prioridade agora é rodar/testar o que já existe no app antes de continuar empilhando mudanças
 - Ainda sem implementar — registrado, baixa prioridade por enquanto
 -
+---
+
+### Rodada de 21/08/2026 — troca de conta Supabase, ajustes de teste e triagem da análise de mercado
+
+> Registrado a partir da conversa de 21/08. Nada aqui foi implementado ainda — virou os três
+> prompts `prompt-1-banco-de-dados.md`, `prompt-2-bugs-e-ajustes.md` e
+> `prompt-3-finalizacao-relatorios-cadastros.md`, nessa ordem obrigatória.
+
+**A. Banco de dados vai ser recriado do zero**
+- O Alexandre trocou de conta do Supabase. O projeto novo está vazio; a criação será feita pela Cursor conectada ao Supabase via MCP
+- **Risco crítico levantado:** o template de checklist "Preventiva Completa GMG" (67 itens) existia **só como linhas na conta antiga** — não há nenhum arquivo de seed no repositório. Se o acesso à conta antiga se perder, os 67 itens se perdem junto. Exportar isso é a primeira coisa a fazer
+- Também confirmado no schema: `equipamentos` **não tem** as colunas `placa_motor`/`placa_alternador`, mas `NovaOS.js` e `EditarOS.js` já gravam nelas — bug latente, corrigido no banco novo
+
+**B. Lista de clientes — 107, não 77**
+- O PDF `Genforce | Clientes` foi relido por completo: são **107 clientes**, não 77. A diferença é que várias empresas aparecem em mais de um endereço (CLARO S/A tem 6 linhas, Victoria Empreendimentos 2, Lojas Americanas 3, Embaixada da Irlanda 2)
+- Extraído para `clientes-genforce.csv` (código legado, nome, razão social, endereço, cidade, UF), pronto pra carga inicial. 100 no DF, 4 em GO, 1 em PE, 1 no RJ, 1 em SP
+- Sem CNPJ, telefone ou e-mail — o PDF não trazia esses dados
+
+**C. Ajustes pedidos depois do teste do app (21/08)**
+1. Botão "Atualizar (ver o que outros técnicos já preencheram)" deve virar ícone pequeno no canto superior direito, igual ao 🔄 da lista de OS
+2. **Bug:** o filtro de data reseta pra "Hoje" ao voltar da OS. Causa raiz identificada: `App.js` troca de tela por `if`+`return`, o que desmonta `ListaOS` e joga o estado fora. Correção é subir o estado do filtro pra fora da tela
+3. **Bug:** dados preenchidos se perdem ao sair sem salvar → precisa de auto-save com debounce e indicador de estado
+4. Checklist dividido em seções colapsáveis com contador e **botão de salvar por seção** — as seções saem da coluna `checklist_template_itens.grupo`, que já existe
+5. Assinatura do cliente e do técnico, com área de desenho, nome, editar e excluir — ambas obrigatórias pra fechar a OS. A tabela `assinaturas` já existe e nunca foi usada
+6. **Fluxo de finalização:** OS concluída entra numa fila de revisão visível só pra admin/supervisor → Finalizar (status novo `finalizado` + PDF por e-mail pro cliente) ou Solicitar correção (volta pra `andamento` com observação)
+7. Página de Relatórios com filtros por seleção (cliente, tipo, status, pendências, período) — **regra geral: campo com conjunto fixo de valores nunca é digitação livre, sempre dropdown**
+
+**Pontos em aberto desta rodada:**
+- O "comparativo de desempenho no Dashboard" citado junto com a assinatura do técnico **não existe no código nem em nenhum documento** — precisa ser especificado antes de virar tela
+- Envio automático de PDF por e-mail exige Edge Function + provedor de e-mail (Resend/SendGrid) com conta e API key do Alexandre — decisão pendente
+- ~~Nomes e e-mails das contas da equipe~~ — **nomes e papéis informados em 22/08** (7 pessoas, ver seção 5). Faltam só os e-mails de 6 delas, que o Alexandre vai levantar durante a semana
+
+**D. Triagem dos 10 pontos da análise de mercado**
+
+Aprovados e distribuídos nos prompts:
+- Assinatura digital (ponto 1 e 2) → Prompt 2
+- Fluxo de aprovação do supervisor (ponto 1) → Prompt 3, dentro do app (não painel web separado)
+- PDF automático por e-mail (ponto 1) → Prompt 3, com ressalva de infraestrutura
+- Tabelas sem tela: `assinaturas` → Prompt 2; `relatorio_pecas` → Prompt 3. `os_tecnicos` continua adiado
+- Cadastros incompletos de cliente e equipamento (ponto 3) → Prompt 3
+- Rastreio de peça por código/nº de série + ciclo peça↔pendência↔filtro do GMG (pontos 6 e 8) → Prompt 3
+
+Continuam fora do escopo, por decisão desta rodada:
+- Modo offline com fila de sincronização (ponto 7) — projeto à parte
+- Geofence / validação de proximidade (pontos 5 e 9) — bloqueado: unidades têm endereço em texto, não coordenadas
+- Checklist com lógica condicional (ponto 4) — prioridade baixa até o checklist em seções estar estável
+- Destaque visual de itens fora do padrão (ponto 10) — ideia aprovada em conceito, ainda não priorizada
+- Painel web separado — a fila de revisão roda dentro do app por enquanto
+
+**E. Export de Ordens de Serviço do 8Confirma (22/08/2026) — o que ele confirma**
+- Recebido `Genforce | Ordens de Serviço.csv`: 100 OS reais, período de 03/08 a 28/08/2026
+- **Não substitui a lista de clientes** — cita 87 clientes distintos (contra 107 do cadastro), sem código, endereço ou razão social separada. É outra coisa: é o histórico de OS
+- **Confirma os 5 status** exatamente como já estavam no Prompt 1: PROGRAMADO (25), PENDENTE (1), ANDAMENTO (9), CONCLUÍDO (19), FINALIZADO (46)
+- **Confirma a multi-seleção de modalidade**: a OS 10215 (Banco Central) tem "MANUTENÇÃO PREVENTIVA" **e** "TESTE COM CARGA PROGRAMADO" juntas. Era 1 caso em 100, mas existe de verdade
+- Distribuição de modalidade: Preventiva 90, Corretiva 4, Teste com Carga 2, Visita Técnica 2, Emergência 1, vazio 2
+- **Campo novo descoberto: "Prioridade"** — todas as 100 OS estão como "4 | Normal", sugerindo uma escala numérica de prioridade que o nosso app não tem. **Em aberto:** perguntar ao Alexandre se a Genforce usa outras prioridades ou se é sempre Normal (se for sempre Normal, não vale implementar)
+- **Confirma a janela de data/hora início → fim**: só 5 das 100 OS usam, e são justamente as de fora do DF (consulados de Recife, Rio e São Paulo, embaixada americana) — viagens de mais de um dia. Nas OS locais é só uma data
+- Descrição mais comum, de longe: "MANUTENÇÃO PREVENTIVA CONFORME CRONOGRAMA" — vale considerar como texto padrão sugerido ao criar OS
+- **Em aberto:** decidir se as 25 OS com status PROGRAMADO (manutenções de 24 a 28/08) devem ser importadas pro banco novo. Elas não têm unidade nem equipamento no export, e o nosso schema exige `os_equipamentos`, então importar geraria OS incompletas
