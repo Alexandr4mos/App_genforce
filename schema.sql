@@ -1,21 +1,23 @@
 -- =========================================================
--- MODELO DE DADOS — APP DE MANUTENÇÃO DE GERADORES
--- Baseado no fluxo do 8Confirma + melhorias solicitadas
--- Banco: Supabase (Postgres)
+-- MODELO DE DADOS — APP DE MANUTENÇÃO DE GERADORES (Genforce)
+-- Banco: Supabase Postgres — projeto dfpmhqsqksewcjexrmhg
+-- Atualizado em 23/08/2026 — reflete o banco novo criado do zero
 -- =========================================================
 
--- Extensão para gerar UUIDs
 create extension if not exists "uuid-ossp";
 
 -- ---------------------------------------------------------
--- 1. CLIENTES (empresa/condomínio/instituição atendida)
+-- 1. CLIENTES
 -- ---------------------------------------------------------
 create table clientes (
   id uuid primary key default uuid_generate_v4(),
+  codigo_legado int unique,
   nome text not null,
   razao_social text,
   cnpj text,
   endereco text,
+  cidade text,
+  uf text,
   telefone text,
   email text,
   ativo boolean default true,
@@ -23,8 +25,7 @@ create table clientes (
 );
 
 -- ---------------------------------------------------------
--- 2. UNIDADES (local físico do cliente, ex: "Edifício X",
---    útil quando um cliente tem mais de um site)
+-- 2. UNIDADES
 -- ---------------------------------------------------------
 create table unidades (
   id uuid primary key default uuid_generate_v4(),
@@ -42,24 +43,41 @@ create table unidades (
 create table equipamentos (
   id uuid primary key default uuid_generate_v4(),
   unidade_id uuid references unidades(id) on delete cascade,
-  tag text not null,                    -- ex: "GMG 01"
+  tag text not null,
   fabricante_gmg text,
   modelo_alternador text,
   n_serie_alternador text,
+  n_serie_gmg text,
+  ano_fabricacao int,
   tensao text,
   potencia_kva numeric,
   fabricante_motor text,
   modelo_motor text,
   n_serie_motor text,
-  tipo_gmg text,                        -- ex: "ABERTO"
+  placa_motor text,
+  placa_alternador text,
+  data_inicio_contrato date,
+  tipo_gmg text,
   fabricante_alternador text,
   ativo boolean default true,
   criado_em timestamptz default now()
 );
 
 -- ---------------------------------------------------------
+-- 3b. EQUIPAMENTO_FILTROS (numeração de filtros por GMG)
+-- ---------------------------------------------------------
+create table equipamento_filtros (
+  id uuid primary key default uuid_generate_v4(),
+  equipamento_id uuid references equipamentos(id) on delete cascade,
+  tipo_filtro text not null,   -- 'oleo' | 'combustivel' | 'ar' | 'separador'
+  numero_peca text not null,
+  observacao text
+);
+
+create index idx_equipamento_filtros_equip on equipamento_filtros(equipamento_id);
+
+-- ---------------------------------------------------------
 -- 4. USUARIOS (equipe — vinculado ao auth.users)
---    Hoje: 5 técnicos + 1 supervisor + 2 admin = 8 contas
 -- ---------------------------------------------------------
 create table usuarios (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -70,15 +88,12 @@ create table usuarios (
   criado_em timestamptz default now()
 );
 
-
-
 -- ---------------------------------------------------------
--- 5. CHECKLIST_TEMPLATES (modelo reutilizável de checklist
---    por tipo de manutenção/equipamento)
+-- 5. CHECKLIST_TEMPLATES
 -- ---------------------------------------------------------
 create table checklist_templates (
   id uuid primary key default uuid_generate_v4(),
-  nome text not null,                   -- ex: "Preventiva Mensal GMG"
+  nome text not null,
   descricao text,
   ativo boolean default true
 );
@@ -86,25 +101,26 @@ create table checklist_templates (
 create table checklist_template_itens (
   id uuid primary key default uuid_generate_v4(),
   template_id uuid references checklist_templates(id) on delete cascade,
-  grupo text,                           -- ex: "Mecânica / Sistema de Arrefecimento"
-  titulo text not null,                 -- ex: "Nível de óleo lubrificante"
+  grupo text,
+  titulo text not null,
   tipo_resposta text not null,          -- 'opcoes' | 'numero' | 'texto'
-  opcoes text[],                        -- ex: {"Nível OK","Nível baixo"}
-  unidade text,                         -- ex: "Vac", "RPM", "Km"
+  opcoes text[],
+  unidade text,
   obrigatorio boolean default true,
   ordem int
 );
 
 -- ---------------------------------------------------------
--- 6. ORDENS_SERVICO (OS)
+-- 6. ORDENS_SERVICO
 -- ---------------------------------------------------------
 create table ordens_servico (
   id uuid primary key default uuid_generate_v4(),
-  numero serial unique,                 -- número sequencial tipo #9735
+  numero serial unique,
+  numero_legado int unique,
   cliente_id uuid references clientes(id),
   unidade_id uuid references unidades(id),
-  tipo text,                            -- OBSOLETO desde a migração 01 — ver tabela os_tipos abaixo. Mantido só por segurança (dados antigos), não é mais lido pelo app.
-  status text not null default 'pendente', -- pendente|andamento|pausada|concluida|agendado
+  status text not null default 'pendente',
+  -- agendado | pendente | andamento | pausada | concluida | finalizado
   descricao text,
   data_inicio_prevista timestamptz,
   data_fim_prevista timestamptz,
@@ -117,28 +133,35 @@ create table ordens_servico (
   km_saida numeric,
   km_retorno numeric,
   observacoes_gerais text,
+  aprovado_supervisor boolean default false,
+  aprovado_por uuid references usuarios(id),
+  aprovado_em timestamptz,
+  enviado_cliente_em timestamptz,
+  observacao_correcao text,
+  importado boolean default false,
   criado_em timestamptz default now()
 );
 
--- Tipos/modalidades de uma OS (N:N — uma OS pode ter mais de um tipo,
--- ex: "Teste com Carga Programado" + "Manutenção Preventiva" juntos).
--- Adicionada na migração 01 (18/08/2026), substitui a coluna ordens_servico.tipo.
--- Valores usados pelo app: 'atendimento_emergencia' | 'manutencao_corretiva' |
--- 'visita_tecnica' | 'teste_carga_programado' | 'manutencao_preventiva'
+-- Tipos/modalidades N:N (substitui coluna ordens_servico.tipo removida)
 create table os_tipos (
   os_id uuid references ordens_servico(id) on delete cascade,
   tipo text not null,
   primary key (os_id, tipo)
 );
 
--- Técnicos alocados numa OS (N:N)
+-- Grupos de checklist não obrigatórios para fechar esta OS (Parte 8 Prompt 3)
+create table os_grupos_opcionais (
+  os_id uuid not null references ordens_servico(id) on delete cascade,
+  grupo text not null,
+  primary key (os_id, grupo)
+);
+
 create table os_tecnicos (
   os_id uuid references ordens_servico(id) on delete cascade,
   tecnico_id uuid references usuarios(id) on delete cascade,
   primary key (os_id, tecnico_id)
 );
 
--- Equipamentos atendidos numa OS (N:N, uma OS pode ter GMG 01 + GMG 02)
 create table os_equipamentos (
   id uuid primary key default uuid_generate_v4(),
   os_id uuid references ordens_servico(id) on delete cascade,
@@ -147,107 +170,100 @@ create table os_equipamentos (
 );
 
 -- ---------------------------------------------------------
--- 7. CHECKLIST_RESPOSTAS (preenchimento real de cada item
---    durante a execução da OS)
+-- 7. CHECKLIST_RESPOSTAS
 -- ---------------------------------------------------------
 create table checklist_respostas (
   id uuid primary key default uuid_generate_v4(),
   os_equipamento_id uuid references os_equipamentos(id) on delete cascade,
   template_item_id uuid references checklist_template_itens(id),
-  resposta text,                        -- valor escolhido ou digitado
+  resposta text,
   observacao text,
   respondido_por uuid references usuarios(id),
   respondido_em timestamptz default now()
 );
 
 -- ---------------------------------------------------------
--- 8. FOTOS (evidências — vinculadas a um item de checklist
---    ou diretamente à OS)
+-- 8. PENDÊNCIAS (antes de fotos por FK pendencia_id)
+-- ---------------------------------------------------------
+create table pendencias (
+  id uuid primary key default uuid_generate_v4(),
+  equipamento_id uuid references equipamentos(id),
+  os_origem_id uuid references ordens_servico(id),
+  os_baixa_id uuid references ordens_servico(id),
+  item_solicitado text not null,
+  observacao_tecnico text,
+  prioridade text default 'media',
+  status text not null default 'solicitada',
+  solicitado_por uuid references usuarios(id),
+  solicitado_em timestamptz default now(),
+  baixado_por uuid references usuarios(id),
+  baixado_em timestamptz,
+  observacao_baixa text
+);
+
+-- ---------------------------------------------------------
+-- 9. FOTOS (evidências)
 -- ---------------------------------------------------------
 create table fotos (
   id uuid primary key default uuid_generate_v4(),
   checklist_resposta_id uuid references checklist_respostas(id) on delete cascade,
   os_id uuid references ordens_servico(id) on delete cascade,
-  url text not null,                    -- caminho no Supabase Storage
+  pendencia_id uuid references pendencias(id) on delete cascade,
+  url text not null,
   legenda text,
   criado_em timestamptz default now()
 );
 
 -- ---------------------------------------------------------
--- 9. PENDÊNCIAS ★ (fluxo real: técnico solicita → comercial
---    aciona proposta → cliente aprova → serviço executado →
---    técnico dá baixa. Fica vinculada ao EQUIPAMENTO, então
---    aparece em toda manutenção seguinte até ser baixada.)
--- ---------------------------------------------------------
-create table pendencias (
-  id uuid primary key default uuid_generate_v4(),
-  equipamento_id uuid references equipamentos(id),
-  os_origem_id uuid references ordens_servico(id),    -- OS onde o técnico relatou
-  os_baixa_id uuid references ordens_servico(id),     -- OS onde o serviço foi feito e deu baixa
-
-  item_solicitado text not null,        -- ex: "Troca de óleo lubrificante"
-  observacao_tecnico text,              -- relato de quem identificou
-  prioridade text default 'media',      -- baixa|media|alta|critica
-
-  -- status reflete o fluxo comercial/operacional real, não só aberta/fechada
-  status text not null default 'solicitada',
-  -- valores esperados:
-  -- 'solicitada'          -> técnico acabou de relatar
-  -- 'aguardando_comercial'-> comercial avisado, aguardando proposta
-  -- 'proposta_enviada'    -> proposta enviada ao cliente
-  -- 'aprovada'            -> cliente aprovou, aguardando execução
-  -- 'recusada'            -> cliente não aprovou (fica registrado, não some)
-  -- 'resolvida'           -> serviço feito e técnico deu baixa
-
-  solicitado_por uuid references usuarios(id),
-  solicitado_em timestamptz default now(),
-
-  baixado_por uuid references usuarios(id),           -- técnico que deu baixa
-  baixado_em timestamptz,
-  observacao_baixa text                               -- o que foi feito na baixa
-);
-
--- ---------------------------------------------------------
--- 9b. RELATORIO_PECAS (controle do que já foi trocado —
---     prova pro cliente em caso de questionamento)
+-- 10. RELATORIO_PECAS
 -- ---------------------------------------------------------
 create table relatorio_pecas (
   id uuid primary key default uuid_generate_v4(),
   os_id uuid references ordens_servico(id) on delete cascade,
   equipamento_id uuid references equipamentos(id),
-  pendencia_id uuid references pendencias(id),        -- null se troca avulsa, sem pendência prévia
-  peca text not null,                   -- ex: "Filtro de óleo lubrificante"
+  pendencia_id uuid references pendencias(id),
+  peca text not null,
+  codigo_peca text,
   quantidade numeric default 1,
-  observacao text,                      -- detalhe da troca
+  observacao text,
   tecnico_id uuid references usuarios(id),
   data_hora timestamptz default now()
 );
 
 -- ---------------------------------------------------------
--- 10. ASSINATURAS (cliente e técnico ao final da OS)
+-- 11. ASSINATURAS
 -- ---------------------------------------------------------
 create table assinaturas (
   id uuid primary key default uuid_generate_v4(),
   os_id uuid references ordens_servico(id) on delete cascade,
   tipo text not null,                   -- 'cliente' | 'tecnico'
   nome_responsavel text,
-  imagem_url text,                      -- assinatura desenhada, salva como imagem
+  imagem_url text,
+  usuario_id uuid references usuarios(id),
   criado_em timestamptz default now()
 );
 
 -- =========================================================
--- ÍNDICES úteis para as telas mais consultadas
+-- ÍNDICES
 -- =========================================================
 create index idx_os_status on ordens_servico(status);
 create index idx_os_cliente on ordens_servico(cliente_id);
 create index idx_os_tipos_os on os_tipos(os_id);
+create index idx_os_grupos_opcionais_os on os_grupos_opcionais(os_id);
 create index idx_pendencias_status on pendencias(status);
 create index idx_pendencias_equipamento on pendencias(equipamento_id);
 create index idx_relatorio_pecas_os on relatorio_pecas(os_id);
 create index idx_equipamentos_unidade on equipamentos(unidade_id);
 
 -- =========================================================
--- OBS: no Supabase, ative Row Level Security (RLS) em todas
--- as tabelas e crie policies por perfil (técnico só vê suas
--- OS do dia; cliente, se tiver portal, só vê as próprias).
+-- STORAGE: bucket publico "evidencias" (fotos + assinaturas)
+-- =========================================================
+-- insert into storage.buckets (id, name, public) values ('evidencias', 'evidencias', true);
+-- Policies em storage.objects para authenticated (insert/update/delete) e anon (select)
+
+-- =========================================================
+-- RLS: habilitado em todas as tabelas public
+-- Funções: is_privileged(), user_can_access_os(), user_can_access_os_equipamento()
+-- Técnico: le/escreve OS alocadas; le clientes/unidades/equipamentos/templates
+-- Admin/supervisor: acesso total
 -- =========================================================

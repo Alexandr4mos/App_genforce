@@ -18,6 +18,7 @@ import { supabase } from '../lib/supabase';
 import { useTema } from '../lib/tema';
 import { avisar, confirmarAcao } from '../lib/avisos';
 import { corDoStatus, rotuloStatus, rotuloTipo } from '../lib/constantes';
+import { itemExigeResposta, gruposOpcionaisIniciais } from '../lib/gruposOS';
 import { formatarJanelaPrevista } from '../lib/dateRangeService';
 import { abrirRelatorioParaImpressao } from '../lib/relatorioPdf';
 import AssinaturaCampo from '../components/AssinaturaCampo';
@@ -46,12 +47,12 @@ function agruparItensPorGrupo(itens) {
   return grupos.map((nome) => ({ nome, itens: mapa.get(nome) }));
 }
 
-function calcularProgresso(eqs, resps, soObrigatorios = false) {
+function calcularProgresso(eqs, resps, soObrigatorios = false, gruposOpcionais = null) {
   let total = 0;
   let feitos = 0;
   (eqs || []).forEach((eq) => {
     (eq.itens || []).forEach((item) => {
-      if (soObrigatorios && item.obrigatorio === false) return;
+      if (soObrigatorios && !itemExigeResposta(item, gruposOpcionais)) return;
       total += 1;
       const v = resps[chave(eq.id, item.id)];
       if (v != null && String(v).trim() !== '') feitos += 1;
@@ -122,6 +123,7 @@ export default function OSDetail({ osId, userId, onBack }) {
   const [mostrarCorrecao, setMostrarCorrecao] = useState(false);
   const [textoCorrecao, setTextoCorrecao] = useState('');
   const [processandoRevisao, setProcessandoRevisao] = useState(false);
+  const [gruposOpcionais, setGruposOpcionais] = useState(new Set());
 
   const debounceTimers = useRef({});
   const respostasRef = useRef({});
@@ -132,6 +134,7 @@ export default function OSDetail({ osId, userId, onBack }) {
   const assinaturaClienteRef = useRef(null);
   const assinaturaTecnicoRef = useRef(null);
   const osEquipamentosRef = useRef([]);
+  const gruposOpcionaisRef = useRef(new Set());
 
   useEffect(() => {
     respostasRef.current = respostas;
@@ -157,6 +160,9 @@ export default function OSDetail({ osId, userId, onBack }) {
   useEffect(() => {
     osEquipamentosRef.current = osEquipamentos;
   }, [osEquipamentos]);
+  useEffect(() => {
+    gruposOpcionaisRef.current = gruposOpcionais;
+  }, [gruposOpcionais]);
 
   useEffect(() => {
     loadData();
@@ -165,10 +171,11 @@ export default function OSDetail({ osId, userId, onBack }) {
     };
   }, [osId]);
 
-  function checklistCompleto(eqs, resps) {
+  function checklistCompleto(eqs, resps, gruposOpc = gruposOpcionaisRef.current) {
     if (!eqs || eqs.length === 0) return false;
     return eqs.every((eq) =>
       (eq.itens || []).every((item) => {
+        if (!itemExigeResposta(item, gruposOpc)) return true;
         const v = resps[chave(eq.id, item.id)];
         return v != null && String(v).trim() !== '';
       })
@@ -181,9 +188,10 @@ export default function OSDetail({ osId, userId, onBack }) {
     assCliente = assinaturaClienteRef.current,
     assTecnico = assinaturaTecnicoRef.current,
     eqs = osEquipamentosRef.current,
+    gruposOpc = gruposOpcionaisRef.current,
   } = {}) {
     const ok =
-      checklistCompleto(eqs, resps) &&
+      checklistCompleto(eqs, resps, gruposOpc) &&
       Boolean(obsGeral && String(obsGeral).trim()) &&
       Boolean(assCliente?.imagem_url) &&
       Boolean(assTecnico?.imagem_url);
@@ -286,7 +294,19 @@ export default function OSDetail({ osId, userId, onBack }) {
       .single();
 
     const { data: tiposOs } = await supabase.from('os_tipos').select('tipo').eq('os_id', osId);
-    setOsTipos((tiposOs || []).map((t) => t.tipo));
+    const tiposLista = (tiposOs || []).map((t) => t.tipo);
+    setOsTipos(tiposLista);
+
+    const { data: gruposOpcDb } = await supabase
+      .from('os_grupos_opcionais')
+      .select('grupo')
+      .eq('os_id', osId);
+    const opcionais = gruposOpcionaisIniciais(
+      tiposLista,
+      (gruposOpcDb || []).map((g) => g.grupo)
+    );
+    setGruposOpcionais(opcionais);
+    gruposOpcionaisRef.current = opcionais;
 
     const { data: usuarioAtual } = await supabase.from('usuarios').select('papel').eq('id', userId).single();
     setUsuarioPapel(usuarioAtual?.papel || 'tecnico');
@@ -388,6 +408,7 @@ export default function OSDetail({ osId, userId, onBack }) {
       assCliente,
       assTecnico,
       eqs: withItens,
+      gruposOpc: opcionais,
     });
 
     setLoading(false);
@@ -489,6 +510,7 @@ export default function OSDetail({ osId, userId, onBack }) {
     const faltando = [];
     dadosFrescos.osEquipamentos.forEach((eq) => {
       eq.itens.forEach((item) => {
+        if (!itemExigeResposta(item, gruposOpcionaisRef.current)) return;
         if (!dadosFrescos.respostas[chave(eq.id, item.id)]) {
           faltando.push(`${eq.equipamentos?.tag || 'Gerador'}: ${item.titulo}`);
         }
@@ -1193,6 +1215,7 @@ export default function OSDetail({ osId, userId, onBack }) {
       const faltando = [];
       osEquipamentos.forEach((eq) => {
         eq.itens.forEach((item) => {
+          if (!itemExigeResposta(item, gruposOpcionaisRef.current)) return;
           if (!respostasRef.current[chave(eq.id, item.id)]) {
             faltando.push(`${eq.equipamentos?.tag || 'Gerador'}: ${item.titulo}`);
           }
@@ -1456,8 +1479,8 @@ export default function OSDetail({ osId, userId, onBack }) {
   const concluida = osConcluida(osInfo?.status);
   const privilegiado = usuarioPapel === 'admin' || usuarioPapel === 'supervisor';
   const corStatus = corDoStatus(osInfo?.status || 'pendente');
-  const progObrig = calcularProgresso(osEquipamentos, respostas, true);
-  const progTodos = calcularProgresso(osEquipamentos, respostas, false);
+  const progObrig = calcularProgresso(osEquipamentos, respostas, true, gruposOpcionais);
+  const progTodos = calcularProgresso(osEquipamentos, respostas, false, gruposOpcionais);
   const cliente = osInfo?.clientes;
 
   function acaoCheckInOut() {

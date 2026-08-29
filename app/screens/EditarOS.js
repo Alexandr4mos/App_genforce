@@ -8,11 +8,17 @@ import {
   StyleSheet,
   Button,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { TIPOS_OS, STATUS_OS, TEMPLATE_PADRAO_ID } from '../lib/constantes';
 import { useTema } from '../lib/tema';
 import { avisar, confirmarAcao } from '../lib/avisos';
+import {
+  aplicarMudancaTipos,
+  gruposOpcionaisIniciais,
+  salvarGruposOpcionais,
+} from '../lib/gruposOS';
 
 export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
   const { cores } = useTema();
@@ -48,6 +54,10 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
   const [novoPlacaAlternador, setNovoPlacaAlternador] = useState('');
   const [salvandoEquipamento, setSalvandoEquipamento] = useState(false);
 
+  const [nomesGrupos, setNomesGrupos] = useState([]);
+  const [gruposOpcionais, setGruposOpcionais] = useState(new Set());
+  const [tiposOriginais, setTiposOriginais] = useState([]);
+
   useEffect(() => {
     carregar();
   }, [osId]);
@@ -58,6 +68,15 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
 
   function alternarSelecaoEquipamento(idEquipamento) {
     setEquipamentosSelecionados((prev) => ({ ...prev, [idEquipamento]: !prev[idEquipamento] }));
+  }
+
+  function alternarGrupoObrigatorio(grupo, obrigatorio) {
+    setGruposOpcionais((prev) => {
+      const next = new Set(prev);
+      if (obrigatorio) next.delete(grupo);
+      else next.add(grupo);
+      return next;
+    });
   }
 
   async function carregar() {
@@ -89,6 +108,32 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
       mapaTipos[t.tipo] = true;
     });
     setTiposSelecionados(mapaTipos);
+
+    const tiposLista = Object.keys(mapaTipos).filter((valor) => mapaTipos[valor]);
+    setTiposOriginais(tiposLista);
+
+    const { data: gruposOpcDb } = await supabase
+      .from('os_grupos_opcionais')
+      .select('grupo')
+      .eq('os_id', osId);
+    setGruposOpcionais(
+      gruposOpcionaisIniciais(tiposLista, (gruposOpcDb || []).map((g) => g.grupo))
+    );
+
+    const { data: itensTemplate } = await supabase
+      .from('checklist_template_itens')
+      .select('grupo')
+      .eq('template_id', TEMPLATE_PADRAO_ID)
+      .order('ordem');
+    const vistos = new Set();
+    const grupos = [];
+    (itensTemplate || []).forEach((row) => {
+      if (!vistos.has(row.grupo)) {
+        vistos.add(row.grupo);
+        grupos.push(row.grupo);
+      }
+    });
+    setNomesGrupos(grupos);
 
     const { data: vinculos } = await supabase
       .from('os_equipamentos')
@@ -283,6 +328,16 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
       }
     }
 
+    const gruposFinal = aplicarMudancaTipos(tiposOriginais, tiposEscolhidos, gruposOpcionais);
+    try {
+      await salvarGruposOpcionais(supabase, osId, gruposFinal);
+    } catch (gruposError) {
+      console.log(gruposError);
+      setSalvando(false);
+      avisar(gruposError.message || 'Tente novamente.', 'Erro ao salvar grupos do checklist');
+      return;
+    }
+
     setSalvando(false);
     onSalva();
   }
@@ -343,6 +398,30 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
             </Text>
           </TouchableOpacity>
         ))}
+      </View>
+
+      <Text style={[styles.label, { color: cores.texto }]}>Grupos obrigatórios para fechar</Text>
+      <Text style={[styles.gruposAjuda, { color: cores.textoSuave }]}>
+        Desligue um grupo se ele não se aplica a esta OS — itens vazios desse grupo não bloqueiam o
+        check-out.
+      </Text>
+      <View style={[styles.listaBox, { borderColor: cores.borda }]}>
+        {nomesGrupos.map((grupo) => {
+          const obrigatorio = !gruposOpcionais.has(grupo);
+          return (
+            <View key={grupo} style={[styles.grupoLinha, { borderBottomColor: cores.borda }]}>
+              <Text style={[styles.grupoNome, { color: cores.texto }]} numberOfLines={2}>
+                {grupo}
+              </Text>
+              <Switch
+                value={obrigatorio}
+                onValueChange={(valor) => alternarGrupoObrigatorio(grupo, valor)}
+                trackColor={{ false: '#ccc', true: cores.primario }}
+                thumbColor="#ffffff"
+              />
+            </View>
+          );
+        })}
       </View>
 
       <Text style={[styles.label, { color: cores.texto }]}>Status</Text>
@@ -548,6 +627,16 @@ const styles = StyleSheet.create({
   tipoButtonSelecionado: { backgroundColor: '#007AFF', borderColor: '#007AFF' },
   tipoTexto: { color: '#333' },
   tipoTextoSelecionado: { color: '#fff', fontWeight: 'bold' },
+  gruposAjuda: { fontSize: 12, marginBottom: 8, lineHeight: 18 },
+  grupoLinha: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+  },
+  grupoNome: { flex: 1, fontSize: 13, marginRight: 8 },
   listaBox: { borderWidth: 1, borderColor: '#eee', borderRadius: 8, padding: 4 },
   itemListaTexto: { color: '#333' },
   avisoVazio: { color: '#999', fontStyle: 'italic', padding: 10, fontSize: 13 },

@@ -17,6 +17,7 @@ import DatePickerCampo from '../components/DatePickerCampo';
 import FormularioCliente from '../components/FormularioCliente';
 import FormularioEquipamento from '../components/FormularioEquipamento';
 import { cnpjValido, limparNumeros } from '../lib/mascaras';
+import { gruposOpcionaisPadraoNovaOs, salvarGruposOpcionais } from '../lib/gruposOS';
 
 export default function NovaOS({ onBack, onCriada }) {
   const { cores } = useTema();
@@ -402,6 +403,18 @@ export default function NovaOS({ onBack, onCriada }) {
     if (tiposError) {
       console.log(tiposError);
       avisar(tiposError.message || 'Tente novamente.', 'Erro ao salvar tipo da OS');
+      return;
+    }
+
+    try {
+      await salvarGruposOpcionais(
+        supabase,
+        novaOs.id,
+        gruposOpcionaisPadraoNovaOs(tiposEscolhidos)
+      );
+    } catch (gruposError) {
+      console.log(gruposError);
+      avisar(gruposError.message || 'Tente novamente.', 'Erro ao configurar grupos do checklist');
       return;
     }
 

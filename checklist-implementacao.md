@@ -38,8 +38,9 @@
 > - [x] Parte 3: página **Relatórios** expandida — filtros por seleção, aba busca OS, histórico de pendências resolvidas mantido
 > - [x] Parte 4: fila **Aguardando revisão** (só admin/supervisor), finalizar → `finalizado` + PDF manual (`lib/relatorioPdf.js`); solicitar correção → `andamento` + `observacao_correcao` em destaque
 > - [x] Parte 5: tela **Desempenho** (Dashboard) — contagem de assinaturas `tipo=tecnico` por `usuario_id`; migration `migracao-02-assinaturas-usuario.sql`
-> - [x] Parte 6: redesenho **Detalhe da OS** — cabeçalho colorido, barras de progresso, card resumo, botões Check-In / Informações / Cliente, árvore por equipamento
+> - [x] Parte 6: redesenho **Detalhe da OS** — cabeçalho colorido, barras de progresso, card resumo, botões Check-In / Informações / Cliente, árvore por equipamento; Observações/Assinaturas fora da árvore por equipamento
 > - [x] Parte 7: **switch** modo escuro/claro no menu ☰ + persistência em AsyncStorage (`lib/tema.js`)
+> - [x] Parte 8: grupos de checklist opcionais por OS (`os_grupos_opcionais`), toggle em **Editar OS**, regra automática COM CARGA; migration `migracao-03-os-grupos-opcionais.sql`
 > - [ ] Envio automático de PDF por e-mail — **aguarda** escolha de provedor (Resend/SendGrid) pelo Alexandre
 
 ## Antes de começar — pontos a confirmar (evitam retrabalho)
