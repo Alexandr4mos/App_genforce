@@ -12,6 +12,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { avisar, confirmarAcao } from '../lib/avisos';
 import { STATUS_OS, rotuloTipo, rotuloStatus, corDoStatus, statusEfetivo } from '../lib/constantes';
+import { ehPrivilegiado } from '../lib/auth';
 import { useTema } from '../lib/tema';
 import { useFiltroOS } from '../lib/filtroOS';
 import DateRangeFilter from '../components/DateRangeFilter';
@@ -27,6 +28,7 @@ const OPCOES_ORDENACAO = [
 ];
 
 export default function ListaOS({
+  userId,
   onAbrirOS,
   onCriarOS,
   onEditarOS,
@@ -35,11 +37,13 @@ export default function ListaOS({
   onDashboard,
   onEditarCliente,
   onImportarClientes,
+  onGestaoUsuarios,
   onSair,
 }) {
   const { cores, modoEscuro, alternarTema } = useTema();
   const { dateFilter, setDateFilter, filtroStatus, setFiltroStatus } = useFiltroOS();
   const [menuAberto, setMenuAberto] = useState(false);
+  const [papel, setPapel] = useState(null);
   const [ordens, setOrdens] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -49,6 +53,40 @@ export default function ListaOS({
   const [menuAbertoId, setMenuAbertoId] = useState(null);
   const queryIdRef = useRef(0);
   const appliedRangeRef = useRef(dateFilter.appliedRange);
+
+  const privilegiado = ehPrivilegiado(papel);
+
+  useEffect(() => {
+    if (!userId) return;
+    supabase
+      .from('usuarios')
+      .select('papel')
+      .eq('id', userId)
+      .single()
+      .then(({ data }) => setPapel(data?.papel || 'tecnico'));
+  }, [userId]);
+
+  function tentarCriarOS() {
+    if (!privilegiado) {
+      avisar(
+        'Você não tem permissão para esta ação. Apenas administradores podem criar OS.',
+        'Sem permissão'
+      );
+      return;
+    }
+    onCriarOS();
+  }
+
+  function tentarRemanejar(osId) {
+    if (!privilegiado) {
+      avisar(
+        'Você não tem permissão para esta ação. Apenas administradores podem remanejar OS.',
+        'Sem permissão'
+      );
+      return;
+    }
+    onRemanejar(osId);
+  }
 
   useEffect(() => {
     appliedRangeRef.current = dateFilter.appliedRange;
@@ -249,7 +287,7 @@ export default function ListaOS({
               style={styles.menuOpcao}
               onPress={() => {
                 setMenuAbertoId(null);
-                onRemanejar(item.id);
+                tentarRemanejar(item.id);
               }}
             >
               <Text style={[styles.menuOpcaoTexto, { color: cores.texto }]}>📅 Remanejar</Text>
@@ -274,20 +312,25 @@ export default function ListaOS({
     ? rotuloStatus(filtroStatus)
     : 'Status';
 
+  const itensMenu = [
+    { rotulo: 'Criar OS', onPress: tentarCriarOS },
+    { rotulo: 'Editar cliente', onPress: onEditarCliente },
+    { rotulo: 'Relatório', onPress: onRelatorio },
+    { rotulo: 'Desempenho', onPress: onDashboard },
+    { rotulo: 'Importar clientes', onPress: onImportarClientes },
+    ...(privilegiado
+      ? [{ rotulo: 'Gestão de usuários', onPress: onGestaoUsuarios }]
+      : []),
+    { rotulo: 'Sair', onPress: onSair },
+  ];
+
   return (
     <View style={[styles.container, { backgroundColor: cores.fundo }]}>
       <MenuLateral
         visivel={menuAberto}
         onFechar={() => setMenuAberto(false)}
         toggleTema={{ valor: modoEscuro, onAlternar: alternarTema }}
-        itens={[
-          { rotulo: 'Criar OS', onPress: onCriarOS },
-          { rotulo: 'Editar cliente', onPress: onEditarCliente },
-          { rotulo: 'Relatório', onPress: onRelatorio },
-          { rotulo: 'Desempenho', onPress: onDashboard },
-          { rotulo: 'Importar clientes', onPress: onImportarClientes },
-          { rotulo: 'Sair', onPress: onSair },
-        ]}
+        itens={itensMenu}
       />
 
       <View style={styles.tituloRow}>
