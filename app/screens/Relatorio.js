@@ -18,6 +18,7 @@ import {
   corDoStatus,
 } from '../lib/constantes';
 import SeletorCliente from '../components/SeletorCliente';
+import CalendarioPlanejamento from '../components/CalendarioPlanejamento';
 import DateRangeFilter from '../components/DateRangeFilter';
 import { limitesConsulta, criarEstadoInicialFiltroRelatorio } from '../lib/dateRangeService';
 
@@ -48,6 +49,7 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
   const [filaRevisao, setFilaRevisao] = useState([]);
   const [pendenciasResolvidas, setPendenciasResolvidas] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [painelSuperior, setPainelSuperior] = useState('clientes');
 
   const privilegiado = papel === 'admin' || papel === 'supervisor';
 
@@ -347,12 +349,58 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
 
       {aba === 'busca' ? (
         <>
-          <Text style={[styles.label, { color: cores.texto }]}>Cliente</Text>
-          <SeletorCliente
-            clientes={clientes}
-            clienteId={clienteId}
-            onSelecionar={(c) => setClienteId(c.id)}
-          />
+          <View style={styles.chipsRow}>
+            <TouchableOpacity
+              style={[
+                styles.chip,
+                {
+                  borderColor: cores.primario,
+                  backgroundColor: painelSuperior === 'clientes' ? cores.primario : cores.fundoCard,
+                },
+              ]}
+              onPress={() => setPainelSuperior('clientes')}
+            >
+              <Text
+                style={{
+                  color: painelSuperior === 'clientes' ? '#fff' : cores.primario,
+                  fontSize: 12,
+                  fontWeight: '600',
+                }}
+              >
+                Clientes
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.chip,
+                {
+                  borderColor: cores.primario,
+                  backgroundColor: painelSuperior === 'calendario' ? cores.primario : cores.fundoCard,
+                },
+              ]}
+              onPress={() => setPainelSuperior('calendario')}
+            >
+              <Text
+                style={{
+                  color: painelSuperior === 'calendario' ? '#fff' : cores.primario,
+                  fontSize: 12,
+                  fontWeight: '600',
+                }}
+              >
+                Calendário
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {painelSuperior === 'clientes' ? (
+            <SeletorCliente
+              clientes={clientes}
+              clienteId={clienteId}
+              onSelecionar={(c) => setClienteId(c.id)}
+            />
+          ) : (
+            <CalendarioPlanejamento />
+          )}
 
           <Text style={[styles.label, { color: cores.texto }]}>Status</Text>
           <View style={styles.chipsRow}>
