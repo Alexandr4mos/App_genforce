@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
-import { rotuloStatus, rotuloTipo } from './constantes';
+import { rotuloStatus, rotuloTipo, statusEfetivo } from './constantes';
 import { avisar } from './avisos';
 
 function escHtml(texto) {
@@ -60,7 +60,7 @@ ul{padding-left:20px}img{max-width:280px;border:1px solid #ddd;margin-top:8px}
 @media print{button{display:none}}
 </style></head><body>
 <h1>Relatório OS #${os.numero}</h1>
-<p><strong>Status:</strong> ${escHtml(rotuloStatus(os.status))}</p>
+<p><strong>Status:</strong> ${escHtml(rotuloStatus(statusEfetivo(os)))}</p>
 <p><strong>Cliente:</strong> ${escHtml(os.clientes?.nome)} ${os.clientes?.razao_social ? `(${escHtml(os.clientes.razao_social)})` : ''}</p>
 <p><strong>Modalidades:</strong> ${escHtml(tipos)}</p>
 <p><strong>Descrição:</strong> ${escHtml(os.descricao)}</p>

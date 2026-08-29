@@ -9,7 +9,7 @@ import {
   Button,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { TIPOS_OS, TEMPLATE_PADRAO_ID } from '../lib/constantes';
+import { TIPOS_OS, TEMPLATE_PADRAO_ID, statusEfetivo } from '../lib/constantes';
 import { useTema } from '../lib/tema';
 import { avisar } from '../lib/avisos';
 import SeletorCliente from '../components/SeletorCliente';
@@ -360,7 +360,12 @@ export default function NovaOS({ onBack, onCriada }) {
       .insert({
         cliente_id: clienteId,
         unidade_id: unidadeId,
-        status: 'pendente',
+        status: statusEfetivo({
+          status: 'pendente',
+          data_inicio_prevista: dataConvertida,
+          checkin_em: null,
+          checkout_em: null,
+        }),
         data_inicio_prevista: dataConvertida,
         descricao: descricao.trim() || null,
       })

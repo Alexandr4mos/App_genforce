@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { avisar, confirmarAcao } from '../lib/avisos';
-import { STATUS_OS, rotuloTipo, rotuloStatus, corDoStatus } from '../lib/constantes';
+import { STATUS_OS, rotuloTipo, rotuloStatus, corDoStatus, statusEfetivo } from '../lib/constantes';
 import { useTema } from '../lib/tema';
 import { useFiltroOS } from '../lib/filtroOS';
 import DateRangeFilter from '../components/DateRangeFilter';
@@ -124,7 +124,8 @@ export default function ListaOS({
       mapa[s.valor] = 0;
     });
     ordens.forEach((os) => {
-      if (mapa[os.status] !== undefined) mapa[os.status] += 1;
+      const efetivo = statusEfetivo(os);
+      if (mapa[efetivo] !== undefined) mapa[efetivo] += 1;
     });
     return mapa;
   }, [ordens]);
@@ -133,8 +134,8 @@ export default function ListaOS({
     const termo = busca.trim().toLowerCase();
     const statusAlvo = filtroStatus ? String(filtroStatus).trim() : null;
     let lista = ordens.filter((os) => {
-      const statusOs = String(os.status || '').trim();
-      if (statusAlvo && statusOs !== statusAlvo) return false;
+      const efetivo = statusEfetivo(os);
+      if (statusAlvo && efetivo !== statusAlvo) return false;
       if (!termo) return true;
       const tipos = (os.os_tipos || []).map((t) => rotuloTipo(t.tipo)).join(' ');
       const texto = [
@@ -179,8 +180,9 @@ export default function ListaOS({
     const janela = formatarJanelaPrevista(item.data_inicio_prevista, item.data_fim_prevista);
     const tipos = (item.os_tipos || []).map((t) => t.tipo);
     const equipamentos = chipsEquipamentos(item);
-    const agendado = item.status === 'agendado';
-    const cor = corDoStatus(item.status);
+    const efetivo = statusEfetivo(item);
+    const agendado = efetivo === 'agendado';
+    const cor = corDoStatus(efetivo);
 
     return (
       <View style={[styles.card, { borderLeftColor: cor, backgroundColor: cores.fundoCard, borderColor: cores.borda }]}>
@@ -190,7 +192,7 @@ export default function ListaOS({
               <Text style={[styles.cardTitle, { color: cores.texto }]}>#{item.numero}</Text>
               <View style={[styles.statusChip, { backgroundColor: cor }]}>
                 {agendado ? <Text style={styles.statusChipIcone}>📅 </Text> : null}
-                <Text style={styles.statusChipTexto}>{rotuloStatus(item.status)}</Text>
+                <Text style={styles.statusChipTexto}>{rotuloStatus(efetivo)}</Text>
               </View>
             </View>
           </TouchableOpacity>

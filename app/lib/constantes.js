@@ -1,6 +1,8 @@
 // Valores compartilhados entre NovaOS, EditarOS e a lista de OS (App.js).
 // Centralizado aqui pra não duplicar e desalinhar entre as telas.
 
+import { hojeNoTimezone, parsearDataOs } from './dateRangeService';
+
 // Template padrão usado até existir uma tela de escolha de checklist
 export const TEMPLATE_PADRAO_ID = '55555555-5555-5555-5555-555555555555';
 
@@ -40,13 +42,47 @@ export const COR_STATUS = {
   agendado: '#2196f3', // azul
   pendente: '#e53935', // vermelho
   andamento: '#ffb300', // amarelo
-  pausada: '#9e9e9e', // cinza
+  pausada: '#0d47a1', // azul escuro (tom forte)
   concluida: '#4caf50', // verde
-  finalizado: '#1565c0', // azul escuro
+  finalizado: '#9e9e9e', // cinza
 };
 
 export function corDoStatus(status) {
   return COR_STATUS[status] || '#9e9e9e';
+}
+
+/**
+ * Status exibido/filtrado no app — calculado a partir do fluxo (check-in/out,
+ * finalização) e da data prevista vs. hoje. Não depende só do valor gravado no banco.
+ */
+export function statusEfetivo(os) {
+  if (!os) return 'pendente';
+
+  if (os.status === 'finalizado') return 'finalizado';
+  if (os.checkout_em || os.status === 'concluida') return 'concluida';
+
+  const hoje = hojeNoTimezone();
+  const dataPrevista = parsearDataOs(os.data_inicio_prevista);
+
+  if (os.checkin_em) {
+    if (dataPrevista && dataPrevista.getTime() < hoje.getTime()) {
+      return 'pausada';
+    }
+    return 'andamento';
+  }
+
+  if (dataPrevista && dataPrevista.getTime() > hoje.getTime()) {
+    return 'agendado';
+  }
+
+  return 'pendente';
+}
+
+/** Borda lateral dos grupos do checklist (Parte 4 Prompt 4). */
+export function corBordaGrupoChecklist(completa, statusEfetivoOs) {
+  if (completa) return COR_STATUS.concluida;
+  if (statusEfetivoOs === 'pausada') return COR_STATUS.andamento;
+  return corDoStatus(statusEfetivoOs);
 }
 
 export const UFS_BR = [
