@@ -41,6 +41,7 @@
 > - [x] Parte 6: redesenho **Detalhe da OS** — cabeçalho colorido, barras de progresso, card resumo, botões Check-In / Informações / Cliente, árvore por equipamento; Observações/Assinaturas fora da árvore por equipamento
 > - [x] Parte 7: **switch** modo escuro/claro no menu ☰ + persistência em AsyncStorage (`lib/tema.js`)
 > - [x] Parte 8: grupos de checklist opcionais por OS (`os_grupos_opcionais`), toggle em **Editar OS**, regra automática COM CARGA; migration `migracao-03-os-grupos-opcionais.sql`
+> - [x] Parte 3.3: removido cliente de teste "Alexandre Luiz" do banco (sobra manual, não bug de código)
 > - [ ] Envio automático de PDF por e-mail — **aguarda** escolha de provedor (Resend/SendGrid) pelo Alexandre
 
 ## Antes de começar — pontos a confirmar (evitam retrabalho)
