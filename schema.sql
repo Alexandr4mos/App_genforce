@@ -21,6 +21,7 @@ create table clientes (
   telefone text,
   email text,
   email_alternativo text,
+  telefone_alternativo text,
   ativo boolean default true,
   criado_em timestamptz default now()
 );
@@ -60,6 +61,7 @@ create table equipamentos (
   data_inicio_contrato date,
   tipo_gmg text,
   fabricante_alternador text,
+  periodicidade_manutencao text check (periodicidade_manutencao is null or periodicidade_manutencao in ('mensal', 'trimestral', 'semestral', 'anual')),
   ativo boolean default true,
   criado_em timestamptz default now()
 );

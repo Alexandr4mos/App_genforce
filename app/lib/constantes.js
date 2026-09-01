@@ -129,3 +129,18 @@ export const TIPOS_FILTRO = [
 export function rotuloTipoFiltro(valor) {
   return TIPOS_FILTRO.find((t) => t.valor === valor)?.rotulo || valor;
 }
+
+export const PERIODICIDADES_MANUTENCAO = [
+  { valor: 'mensal', rotulo: 'Mensal', meses: 1 },
+  { valor: 'trimestral', rotulo: 'Trimestral', meses: 3 },
+  { valor: 'semestral', rotulo: 'Semestral', meses: 6 },
+  { valor: 'anual', rotulo: 'Anual', meses: 12 },
+];
+
+export function rotuloPeriodicidade(valor) {
+  return PERIODICIDADES_MANUTENCAO.find((p) => p.valor === valor)?.rotulo || valor;
+}
+
+export function mesesPeriodicidade(valor) {
+  return PERIODICIDADES_MANUTENCAO.find((p) => p.valor === valor)?.meses ?? null;
+}

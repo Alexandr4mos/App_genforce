@@ -204,7 +204,7 @@ export default function OSDetail({ osId, userId, onBack }) {
 
     const { data: osEq, error: osEqError } = await supabase
       .from('os_equipamentos')
-      .select('id, equipamento_id, template_id, equipamentos(tag, fabricante_gmg)')
+      .select('id, equipamento_id, template_id, equipamentos(tag, fabricante_gmg, periodicidade_manutencao)')
       .eq('os_id', osId);
 
     if (osEqError) {
@@ -1933,6 +1933,7 @@ export default function OSDetail({ osId, userId, onBack }) {
                 pecasOs={pecasPorEquipamento[eq.equipamento_id] || []}
                 historicoPecas={historicoPecasPorEquipamento[eq.equipamento_id] || []}
                 filtrosEquipamento={filtrosPorEquipamento[eq.equipamento_id] || []}
+                periodicidadeManutencao={eq.equipamentos?.periodicidade_manutencao}
                 pendencias={pendenciasPorEquipamento[eq.equipamento_id] || []}
                 onPecaRegistrada={(peca) => aoRegistrarPeca(eq.equipamento_id, peca)}
                 preenchimentoInicial={preenchimentoPeca[eq.equipamento_id]}

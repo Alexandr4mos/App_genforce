@@ -20,6 +20,7 @@ import {
   rotulosTiposOs,
   textoProximaTroca,
 } from '../lib/pecasHistorico';
+import { rotuloPeriodicidade } from '../lib/constantes';
 
 function formatarDataHora(valor) {
   if (!valor) return '—';
@@ -59,6 +60,8 @@ export default function HistoricoPecas() {
   const [ordenacao, setOrdenacao] = useState('data_desc');
   const [fotoAmpliada, setFotoAmpliada] = useState(null);
   const [termoCliente, setTermoCliente] = useState('');
+
+  const equipamentoSelecionado = equipamentos.find((eq) => eq.id === equipamentoId);
 
   useEffect(() => {
     const termo = termoCliente.trim();
@@ -105,7 +108,7 @@ export default function HistoricoPecas() {
 
       const { data } = await supabase
         .from('equipamentos')
-        .select('id, tag, fabricante_gmg, unidades(nome)')
+        .select('id, tag, fabricante_gmg, periodicidade_manutencao, unidades(nome)')
         .in('unidade_id', unidadeIds)
         .order('tag');
 
@@ -274,6 +277,12 @@ export default function HistoricoPecas() {
 
       {equipamentoId ? (
         <>
+          {equipamentoSelecionado?.periodicidade_manutencao ? (
+            <Text style={[styles.periodicidadeRef, { color: cores.textoSecundario }]}>
+              Periodicidade contratada: {rotuloPeriodicidade(equipamentoSelecionado.periodicidade_manutencao)}
+            </Text>
+          ) : null}
+
           <TextInput
             style={[
               styles.buscaPeca,
@@ -402,6 +411,7 @@ export default function HistoricoPecas() {
 const styles = StyleSheet.create({
   label: { fontSize: 14, fontWeight: 'bold', marginTop: 8, marginBottom: 8 },
   dica: { fontSize: 12, marginBottom: 8, fontStyle: 'italic' },
+  periodicidadeRef: { fontSize: 13, fontWeight: '600', marginBottom: 10 },
   equipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   equipChip: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 },
   buscaPeca: {

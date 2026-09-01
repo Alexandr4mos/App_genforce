@@ -1,6 +1,6 @@
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { useTema } from '../lib/tema';
-import { TIPOS_FILTRO } from '../lib/constantes';
+import { TIPOS_FILTRO, PERIODICIDADES_MANUTENCAO } from '../lib/constantes';
 import SecaoColapsavel from './SecaoColapsavel';
 import DatePickerCampo from './DatePickerCampo';
 
@@ -144,6 +144,30 @@ export default function FormularioEquipamento({ valores, onChange, filtros, onCh
       </SecaoColapsavel>
 
       <SecaoColapsavel titulo="Contrato e filtros">
+        <Text style={[styles.labelData, { color: cores.texto }]}>Periodicidade de manutenção</Text>
+        <View style={styles.tipoFiltroRow}>
+          {PERIODICIDADES_MANUTENCAO.map((p) => {
+            const selecionado = valores.periodicidade_manutencao === p.valor;
+            return (
+              <TouchableOpacity
+                key={p.valor}
+                style={[
+                  styles.tipoChip,
+                  {
+                    borderColor: cores.borda,
+                    backgroundColor: selecionado ? cores.primario : cores.fundoCard,
+                  },
+                ]}
+                onPress={() => onChange('periodicidade_manutencao', selecionado ? '' : p.valor)}
+              >
+                <Text style={{ color: selecionado ? '#fff' : cores.texto, fontSize: 11 }}>
+                  {p.rotulo}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
         <Text style={[styles.labelData, { color: cores.texto }]}>Início do contrato de manutenção</Text>
         <DatePickerCampo
           value={valores.data_inicio_contrato || ''}

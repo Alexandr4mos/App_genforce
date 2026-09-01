@@ -14,7 +14,7 @@ import { avisar } from '../lib/avisos';
 import { useTema } from '../lib/tema';
 import { rotuloTipoFiltro } from '../lib/constantes';
 import DatePickerCampo from './DatePickerCampo';
-import { textoProximaTroca } from '../lib/pecasHistorico';
+import { textoProximaTroca, dataSugeridaProximaTroca } from '../lib/pecasHistorico';
 
 function formatarDataHora(valor) {
   if (!valor) return '';
@@ -40,6 +40,7 @@ export default function SecaoPecasTrocadas({
   pecasOs,
   historicoPecas,
   filtrosEquipamento,
+  periodicidadeManutencao,
   pendencias,
   onPecaRegistrada,
   preenchimentoInicial,
@@ -58,6 +59,16 @@ export default function SecaoPecasTrocadas({
   ];
 
   const pendenciasAbertas = (pendencias || []).filter((p) => p.status !== 'resolvida');
+
+  function abrirFormularioPeca() {
+    setForm({
+      ...FORM_VAZIO,
+      proxima_troca_prevista: periodicidadeManutencao
+        ? dataSugeridaProximaTroca(periodicidadeManutencao)
+        : '',
+    });
+    setMostrarForm(true);
+  }
 
   useEffect(() => {
     if (preenchimentoInicial) {
@@ -153,6 +164,11 @@ export default function SecaoPecasTrocadas({
       return;
     }
 
+    let proximaTroca = form.proxima_troca_prevista?.trim() || null;
+    if (!proximaTroca && periodicidadeManutencao) {
+      proximaTroca = dataSugeridaProximaTroca(periodicidadeManutencao) || null;
+    }
+
     setSalvando(true);
     const { data, error } = await supabase
       .from('relatorio_pecas')
@@ -164,7 +180,7 @@ export default function SecaoPecasTrocadas({
         codigo_peca: form.codigo_peca?.trim() || null,
         quantidade: form.quantidade ? Number(form.quantidade) : 1,
         observacao: form.observacao?.trim() || null,
-        proxima_troca_prevista: form.proxima_troca_prevista?.trim() || null,
+        proxima_troca_prevista: proximaTroca,
         tecnico_id: userId,
       })
       .select('*')
@@ -382,10 +398,7 @@ export default function SecaoPecasTrocadas({
         ) : (
           <TouchableOpacity
             style={[styles.botaoAdicionar, { borderColor: cores.primario }]}
-            onPress={() => {
-              setForm(FORM_VAZIO);
-              setMostrarForm(true);
-            }}
+            onPress={abrirFormularioPeca}
           >
             <Text style={[styles.botaoAdicionarTexto, { color: cores.primario }]}>+ Registrar peça trocada</Text>
           </TouchableOpacity>
