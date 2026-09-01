@@ -2,14 +2,29 @@ import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useTema } from '../lib/tema';
 
-export default function SeletorCliente({ clientes, clienteId, onSelecionar, maxAltura = 260 }) {
+export default function SeletorCliente({
+  clientes,
+  clienteId,
+  onSelecionar,
+  maxAltura = 260,
+  filtrarLocal = true,
+  onBuscaChange,
+  placeholderBusca = 'Procurar...',
+}) {
   const { cores } = useTema();
   const [busca, setBusca] = useState('');
   const termo = busca.trim().toLowerCase();
-  const filtrados = (clientes || []).filter((c) => {
-    if (!termo) return true;
-    return `${c.nome || ''} ${c.razao_social || ''}`.toLowerCase().includes(termo);
-  });
+  const filtrados = filtrarLocal
+    ? (clientes || []).filter((c) => {
+        if (!termo) return true;
+        return `${c.nome || ''} ${c.razao_social || ''}`.toLowerCase().includes(termo);
+      })
+    : clientes || [];
+
+  function alterarBusca(valor) {
+    setBusca(valor);
+    onBuscaChange?.(valor);
+  }
 
   return (
     <View>
@@ -18,10 +33,10 @@ export default function SeletorCliente({ clientes, clienteId, onSelecionar, maxA
           styles.input,
           { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard },
         ]}
-        placeholder="Procurar..."
+        placeholder={placeholderBusca}
         placeholderTextColor={cores.placeholder}
         value={busca}
-        onChangeText={setBusca}
+        onChangeText={alterarBusca}
       />
       <View style={[styles.listaBox, { borderColor: cores.borda, maxHeight: maxAltura }]}>
         <ScrollView nestedScrollEnabled>
