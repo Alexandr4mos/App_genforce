@@ -1,29 +1,73 @@
 import { Modal, Pressable, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
 import { useTema } from '../lib/tema';
 
 export default function MenuLateral({ visivel, onFechar, itens, toggleTema }) {
   const { cores } = useTema();
+  const [expandidos, setExpandidos] = useState({});
+
+  useEffect(() => {
+    if (!visivel) setExpandidos({});
+  }, [visivel]);
+
+  function alternarExpansao(rotulo) {
+    setExpandidos((prev) => ({ ...prev, [rotulo]: !prev[rotulo] }));
+  }
 
   return (
     <Modal visible={visivel} transparent animationType="fade" onRequestClose={onFechar}>
       <View style={styles.row}>
         <View style={[styles.painel, { backgroundColor: cores.fundo, borderRightColor: cores.borda }]}>
           <Text style={[styles.titulo, { color: cores.texto }]}>Menu</Text>
-          {itens.map((item) => (
-            <TouchableOpacity
-              key={item.rotulo}
-              style={[styles.item, { borderBottomColor: cores.borda }]}
-              onPress={() => {
-                onFechar();
-                item.onPress();
-              }}
-            >
-              <Text style={[styles.itemTexto, { color: cores.texto }]}>{item.rotulo}</Text>
-              {item.detalhe ? (
-                <Text style={[styles.itemDetalhe, { color: cores.textoSecundario }]}>{item.detalhe}</Text>
-              ) : null}
-            </TouchableOpacity>
-          ))}
+          {itens.map((item) => {
+            if (item.subitens?.length) {
+              const aberto = Boolean(expandidos[item.rotulo]);
+              return (
+                <View key={item.rotulo}>
+                  <TouchableOpacity
+                    style={[styles.item, { borderBottomColor: cores.borda }]}
+                    onPress={() => alternarExpansao(item.rotulo)}
+                  >
+                    <Text style={[styles.itemTexto, { color: cores.texto }]}>
+                      {item.rotulo} {aberto ? '▾' : '▸'}
+                    </Text>
+                  </TouchableOpacity>
+                  {aberto
+                    ? item.subitens.map((sub) => (
+                        <TouchableOpacity
+                          key={sub.rotulo}
+                          style={[styles.subitem, { borderBottomColor: cores.borda }]}
+                          onPress={() => {
+                            onFechar();
+                            sub.onPress();
+                          }}
+                        >
+                          <Text style={[styles.subitemTexto, { color: cores.textoSecundario }]}>
+                            {sub.rotulo}
+                          </Text>
+                        </TouchableOpacity>
+                      ))
+                    : null}
+                </View>
+              );
+            }
+
+            return (
+              <TouchableOpacity
+                key={item.rotulo}
+                style={[styles.item, { borderBottomColor: cores.borda }]}
+                onPress={() => {
+                  onFechar();
+                  item.onPress();
+                }}
+              >
+                <Text style={[styles.itemTexto, { color: cores.texto }]}>{item.rotulo}</Text>
+                {item.detalhe ? (
+                  <Text style={[styles.itemDetalhe, { color: cores.textoSecundario }]}>{item.detalhe}</Text>
+                ) : null}
+              </TouchableOpacity>
+            );
+          })}
 
           {toggleTema ? (
             <View style={[styles.itemToggle, { borderBottomColor: cores.borda, backgroundColor: cores.fundoSecundario }]}>
@@ -64,6 +108,8 @@ const styles = StyleSheet.create({
   },
   titulo: { fontSize: 20, fontWeight: 'bold', paddingHorizontal: 12, marginBottom: 12 },
   item: { paddingVertical: 14, paddingHorizontal: 12, borderBottomWidth: 1 },
+  subitem: { paddingVertical: 12, paddingLeft: 28, paddingRight: 12, borderBottomWidth: 1 },
+  subitemTexto: { fontSize: 15, fontWeight: '500' },
   itemTexto: { fontSize: 16, fontWeight: '600' },
   itemDetalhe: { fontSize: 12, marginTop: 2 },
   itemToggle: {

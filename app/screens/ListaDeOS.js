@@ -24,7 +24,6 @@ import {
 } from '../lib/constantes';
 import SeletorCliente from '../components/SeletorCliente';
 import CalendarioPlanejamento from '../components/CalendarioPlanejamento';
-import HistoricoPecas from '../components/HistoricoPecas';
 import DateRangeFilter from '../components/DateRangeFilter';
 import {
   limitesConsulta,
@@ -49,9 +48,8 @@ function formatarDataHora(valor) {
   });
 }
 
-export default function Relatorio({ onBack, onAbrirOS, userId }) {
+export default function ListaDeOS({ onBack, onAbrirOS, userId }) {
   const { cores } = useTema();
-  const [aba, setAba] = useState('busca');
   const [papel, setPapel] = useState(null);
   const [clientes, setClientes] = useState([]);
   const [clienteId, setClienteId] = useState(null);
@@ -64,7 +62,6 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
   const [pendenciasResolvidas, setPendenciasResolvidas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [painelSuperior, setPainelSuperior] = useState('calendario');
-  const [secaoRelatorio, setSecaoRelatorio] = useState('lista');
 
   const privilegiado = papel === 'admin' || papel === 'supervisor';
 
@@ -81,7 +78,7 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
   }, [userId]);
 
   useEffect(() => {
-    if (privilegiado) carregarFilaRevisao();
+    if (privilegiado) carregarFilaRevisao({ silencioso: true });
   }, [privilegiado]);
 
   const tiposAtivosKey = useMemo(
@@ -111,9 +108,8 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
   }
 
   useEffect(() => {
-    if (aba === 'busca') buscarOS();
-    else if (aba === 'revisao' && privilegiado) carregarFilaRevisao();
-  }, [aba, clienteId, filtroStatus, tiposAtivosKey, somenteComPendencia, dateFilter.appliedRange, privilegiado]);
+    buscarOS();
+  }, [clienteId, filtroStatus, tiposAtivosKey, somenteComPendencia, dateFilter.appliedRange]);
 
   useEffect(() => {
     if (clienteId) carregarPendenciasResolvidas(clienteId);
@@ -258,17 +254,17 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
     return ids;
   }
 
-  async function carregarFilaRevisao() {
-    setLoading(true);
+  async function carregarFilaRevisao({ silencioso = false } = {}) {
+    if (!silencioso) setLoading(true);
     const { data, error } = await supabase
       .from('ordens_servico')
       .select(
-        `id, numero, status, descricao, checkout_em,
+        `id, numero, status, descricao, checkout_em, data_inicio_prevista, checkin_em, criado_em, prioridade,
         clientes(nome, razao_social), os_tipos(tipo)`
       )
       .eq('status', 'concluida')
       .order('checkout_em', { ascending: false });
-    setLoading(false);
+    if (!silencioso) setLoading(false);
     if (error) {
       avisar(error.message, 'Erro ao carregar fila');
       return;
@@ -361,7 +357,6 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
   const clienteAtual = clientes.find((c) => c.id === clienteId);
 
   const listaExibida = useMemo(() => {
-    if (aba === 'revisao') return filaRevisao;
     if (painelSuperior !== 'prioridade') return resultados;
 
     const abertas = new Set(STATUS_OS_ABERTAS);
@@ -375,7 +370,7 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
         const db = parsearDataOs(b.data_inicio_prevista)?.getTime() ?? Number.MAX_SAFE_INTEGER;
         return da - db;
       });
-  }, [aba, painelSuperior, resultados, filaRevisao]);
+  }, [painelSuperior, resultados]);
 
   const temFiltroAtivo =
     filtroStatus ||
@@ -394,121 +389,94 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
       : null,
   ].filter(Boolean);
 
+  const painelRevisaoVazio = privilegiado ? (
+    <View style={styles.painelRevisao}>
+      <Text style={[styles.painelRevisaoTitulo, { color: cores.texto }]}>
+        Aguardando revisão ({filaRevisao.length})
+      </Text>
+      <Text style={[styles.subtitulo, { color: cores.textoSecundario, marginBottom: 8 }]}>
+        OS concluídas aguardando revisão do supervisor.
+      </Text>
+      {filaRevisao.length === 0 ? (
+        <Text style={[styles.vazio, { color: cores.textoSuave }]}>Nenhuma OS na fila.</Text>
+      ) : (
+        filaRevisao.map((os) => renderCardOS(os))
+      )}
+    </View>
+  ) : null;
+
   return (
     <ScrollView style={[styles.container, { backgroundColor: cores.fundo }]}>
       <TouchableOpacity onPress={onBack} style={styles.backButton}>
         <Text style={[styles.backText, { color: cores.primario }]}>{'< Voltar'}</Text>
       </TouchableOpacity>
 
-      <Text style={[styles.title, { color: cores.texto }]}>Relatórios</Text>
+      <Text style={[styles.title, { color: cores.texto }]}>Lista de OS</Text>
 
-      <View style={styles.abasRow}>
+      <View style={styles.chipsRow}>
         <TouchableOpacity
-          style={[styles.aba, secaoRelatorio === 'lista' && { backgroundColor: cores.primario }]}
-          onPress={() => setSecaoRelatorio('lista')}
+          style={[
+            styles.chip,
+            {
+              borderColor: cores.primario,
+              backgroundColor: painelSuperior === 'calendario' ? cores.primario : cores.fundoCard,
+            },
+          ]}
+          onPress={() => setPainelSuperior('calendario')}
         >
-          <Text style={[styles.abaTexto, { color: secaoRelatorio === 'lista' ? '#fff' : cores.texto }]}>
-            Lista de OS
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.aba, secaoRelatorio === 'pecas' && { backgroundColor: cores.primario }]}
-          onPress={() => setSecaoRelatorio('pecas')}
-        >
-          <Text style={[styles.abaTexto, { color: secaoRelatorio === 'pecas' ? '#fff' : cores.texto }]}>
-            Peças
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {secaoRelatorio === 'pecas' ? (
-        <HistoricoPecas />
-      ) : (
-        <>
-      <View style={styles.abasRow}>
-        <TouchableOpacity
-          style={[styles.aba, aba === 'busca' && { backgroundColor: cores.primario }]}
-          onPress={() => setAba('busca')}
-        >
-          <Text style={[styles.abaTexto, { color: aba === 'busca' ? '#fff' : cores.texto }]}>Buscar OS</Text>
-        </TouchableOpacity>
-        {privilegiado ? (
-          <TouchableOpacity
-            style={[styles.aba, aba === 'revisao' && { backgroundColor: cores.primario }]}
-            onPress={() => setAba('revisao')}
+          <Text
+            style={{
+              color: painelSuperior === 'calendario' ? '#fff' : cores.primario,
+              fontSize: 12,
+              fontWeight: '600',
+            }}
           >
-            <Text style={[styles.abaTexto, { color: aba === 'revisao' ? '#fff' : cores.texto }]}>
-              Aguardando revisão ({filaRevisao.length})
-            </Text>
-          </TouchableOpacity>
-        ) : null}
+            Calendário
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.chip,
+            {
+              borderColor: cores.primario,
+              backgroundColor: painelSuperior === 'prioridade' ? cores.primario : cores.fundoCard,
+            },
+          ]}
+          onPress={() => setPainelSuperior('prioridade')}
+        >
+          <Text
+            style={{
+              color: painelSuperior === 'prioridade' ? '#fff' : cores.primario,
+              fontSize: 12,
+              fontWeight: '600',
+            }}
+          >
+            Prioridade
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {aba === 'busca' ? (
-        <>
-          <View style={styles.chipsRow}>
-            <TouchableOpacity
-              style={[
-                styles.chip,
-                {
-                  borderColor: cores.primario,
-                  backgroundColor: painelSuperior === 'calendario' ? cores.primario : cores.fundoCard,
-                },
-              ]}
-              onPress={() => setPainelSuperior('calendario')}
-            >
-              <Text
-                style={{
-                  color: painelSuperior === 'calendario' ? '#fff' : cores.primario,
-                  fontSize: 12,
-                  fontWeight: '600',
-                }}
-              >
-                Calendário
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.chip,
-                {
-                  borderColor: cores.primario,
-                  backgroundColor: painelSuperior === 'prioridade' ? cores.primario : cores.fundoCard,
-                },
-              ]}
-              onPress={() => setPainelSuperior('prioridade')}
-            >
-              <Text
-                style={{
-                  color: painelSuperior === 'prioridade' ? '#fff' : cores.primario,
-                  fontSize: 12,
-                  fontWeight: '600',
-                }}
-              >
-                Prioridade
-              </Text>
-            </TouchableOpacity>
-          </View>
+      {painelSuperior === 'calendario' ? (
+        <CalendarioPlanejamento
+          diaSelecionado={diaSelecionadoCalendario}
+          onAlternarDia={alternarDiaCalendario}
+          onLimparDia={limparFiltroDiaCalendario}
+        />
+      ) : (
+        <Text style={[styles.subtitulo, { color: cores.textoSecundario }]}>
+          OS em aberto ordenadas por prioridade (Alto → Médio → Baixo) e data prevista.
+        </Text>
+      )}
 
-          {painelSuperior === 'calendario' ? (
-            <CalendarioPlanejamento
-              diaSelecionado={diaSelecionadoCalendario}
-              onAlternarDia={alternarDiaCalendario}
-              onLimparDia={limparFiltroDiaCalendario}
-            />
-          ) : (
-            <Text style={[styles.subtitulo, { color: cores.textoSecundario }]}>
-              OS em aberto ordenadas por prioridade (Alto → Médio → Baixo) e data prevista.
-            </Text>
-          )}
+      <Text style={[styles.label, { color: cores.texto }]}>Cliente</Text>
+      <SeletorCliente
+        clientes={clientes}
+        clienteId={clienteId}
+        onSelecionar={(c) => setClienteId(c.id)}
+        conteudoQuandoBuscaVazia={painelRevisaoVazio}
+      />
 
-          <Text style={[styles.label, { color: cores.texto }]}>Cliente</Text>
-          <SeletorCliente
-            clientes={clientes}
-            clienteId={clienteId}
-            onSelecionar={(c) => setClienteId(c.id)}
-          />
-
-          <Text style={[styles.label, { color: cores.texto }]}>Status</Text>
+      <Text style={[styles.label, { color: cores.texto }]}>Status</Text>
           <View style={styles.chipsRow}>
             {STATUS_OS.map((s) => (
               <TouchableOpacity
@@ -579,24 +547,16 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
               </Text>
             </View>
           ) : null}
-        </>
-      ) : (
-        <Text style={[styles.subtitulo, { color: cores.textoSecundario }]}>
-          OS concluídas aguardando revisão do supervisor.
-        </Text>
-      )}
 
       {loading ? <ActivityIndicator style={{ marginVertical: 16 }} /> : null}
       {!loading && listaExibida.length === 0 ? (
         <Text style={[styles.vazio, { color: cores.textoSuave }]}>Nenhuma OS encontrada.</Text>
       ) : null}
       {!loading
-        ? listaExibida.map((os) =>
-            renderCardOS(os, { mostrarPrioridade: aba === 'busca' && painelSuperior === 'prioridade' })
-          )
+        ? listaExibida.map((os) => renderCardOS(os, { mostrarPrioridade: painelSuperior === 'prioridade' }))
         : null}
 
-      {aba === 'busca' && clienteAtual ? (
+      {clienteAtual ? (
         <>
           <Text style={[styles.label, { color: cores.texto, marginTop: 20 }]}>
             Pendências resolvidas — {clienteAtual.nome}
@@ -629,8 +589,6 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
       ) : null}
 
       <View style={{ height: 40 }} />
-        </>
-      )}
     </ScrollView>
   );
 }
@@ -666,4 +624,6 @@ const styles = StyleSheet.create({
   cardData: { fontSize: 12 },
   filtroAtivoBar: { borderRadius: 8, padding: 10, marginBottom: 12 },
   filtroAtivoTexto: { fontSize: 13, fontWeight: '600' },
+  painelRevisao: { paddingBottom: 4 },
+  painelRevisaoTitulo: { fontSize: 14, fontWeight: 'bold', marginBottom: 4 },
 });

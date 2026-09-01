@@ -10,10 +10,12 @@ export default function SeletorCliente({
   filtrarLocal = true,
   onBuscaChange,
   placeholderBusca = 'Procurar...',
+  conteudoQuandoBuscaVazia = null,
 }) {
   const { cores } = useTema();
   const [busca, setBusca] = useState('');
   const termo = busca.trim().toLowerCase();
+  const exibirAlternativa = Boolean(conteudoQuandoBuscaVazia) && !termo;
   const filtrados = filtrarLocal
     ? (clientes || []).filter((c) => {
         if (!termo) return true;
@@ -40,6 +42,10 @@ export default function SeletorCliente({
       />
       <View style={[styles.listaBox, { borderColor: cores.borda, maxHeight: maxAltura }]}>
         <ScrollView nestedScrollEnabled>
+          {exibirAlternativa ? (
+            conteudoQuandoBuscaVazia
+          ) : (
+            <>
           {filtrados.map((c) => {
             const selecionado = clienteId === c.id;
             return (
@@ -60,6 +66,8 @@ export default function SeletorCliente({
           {filtrados.length === 0 ? (
             <Text style={[styles.avisoVazio, { color: cores.textoSuave }]}>Nenhum cliente encontrado.</Text>
           ) : null}
+            </>
+          )}
         </ScrollView>
       </View>
     </View>

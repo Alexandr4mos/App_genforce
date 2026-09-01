@@ -8,7 +8,8 @@ import OSDetail from './screens/OSDetail';
 import NovaOS from './screens/NovaOS';
 import EditarOS from './screens/EditarOS';
 import ListaOS from './screens/ListaOS';
-import Relatorio from './screens/Relatorio';
+import ListaDeOS from './screens/ListaDeOS';
+import ListaDePecas from './screens/ListaDePecas';
 import Dashboard from './screens/Dashboard';
 import EditarCliente from './screens/EditarCliente';
 import ImportarClientes from './screens/ImportarClientes';
@@ -37,7 +38,8 @@ function AppInterno() {
   const [osSelecionadaId, setOsSelecionadaId] = useState(null);
   const [criandoOS, setCriandoOS] = useState(false);
   const [osEditandoId, setOsEditandoId] = useState(null);
-  const [mostrandoRelatorio, setMostrandoRelatorio] = useState(false);
+  const [mostrandoListaDeOS, setMostrandoListaDeOS] = useState(false);
+  const [mostrandoListaDePecas, setMostrandoListaDePecas] = useState(false);
   const [mostrandoDashboard, setMostrandoDashboard] = useState(false);
   const [mostrandoEditarCliente, setMostrandoEditarCliente] = useState(false);
   const [mostrandoImportar, setMostrandoImportar] = useState(false);
@@ -95,7 +97,8 @@ function AppInterno() {
   async function handleLogout() {
     await supabase.auth.signOut();
     setOsSelecionadaId(null);
-    setMostrandoRelatorio(false);
+    setMostrandoListaDeOS(false);
+    setMostrandoListaDePecas(false);
     setMostrandoDashboard(false);
     setMostrandoEditarCliente(false);
     setMostrandoImportar(false);
@@ -156,18 +159,27 @@ function AppInterno() {
     );
   }
 
-  if (mostrandoRelatorio) {
+  if (mostrandoListaDeOS) {
     return (
       <>
         <StatusBar style={modoEscuro ? 'light' : 'dark'} />
-        <Relatorio
+        <ListaDeOS
           userId={session.user.id}
-          onBack={() => setMostrandoRelatorio(false)}
+          onBack={() => setMostrandoListaDeOS(false)}
           onAbrirOS={(id) => {
-            setMostrandoRelatorio(false);
+            setMostrandoListaDeOS(false);
             setOsSelecionadaId(id);
           }}
         />
+      </>
+    );
+  }
+
+  if (mostrandoListaDePecas) {
+    return (
+      <>
+        <StatusBar style={modoEscuro ? 'light' : 'dark'} />
+        <ListaDePecas onBack={() => setMostrandoListaDePecas(false)} />
       </>
     );
   }
@@ -233,7 +245,8 @@ function AppInterno() {
         onCriarOS={() => setCriandoOS(true)}
         onEditarOS={setOsEditandoId}
         onRemanejar={setOsRemanejandoId}
-        onRelatorio={() => setMostrandoRelatorio(true)}
+        onListaDeOS={() => setMostrandoListaDeOS(true)}
+        onListaDePecas={() => setMostrandoListaDePecas(true)}
         onDashboard={() => setMostrandoDashboard(true)}
         onEditarCliente={() => setMostrandoEditarCliente(true)}
         onImportarClientes={() => setMostrandoImportar(true)}

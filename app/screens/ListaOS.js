@@ -33,7 +33,8 @@ export default function ListaOS({
   onCriarOS,
   onEditarOS,
   onRemanejar,
-  onRelatorio,
+  onListaDeOS,
+  onListaDePecas,
   onDashboard,
   onEditarCliente,
   onImportarClientes,
@@ -315,7 +316,13 @@ export default function ListaOS({
   const itensMenu = [
     { rotulo: 'Criar OS', onPress: tentarCriarOS },
     { rotulo: 'Editar cliente', onPress: onEditarCliente },
-    { rotulo: 'Relatório', onPress: onRelatorio },
+    {
+      rotulo: 'Relatório',
+      subitens: [
+        { rotulo: 'Lista de OS', onPress: onListaDeOS },
+        { rotulo: 'Lista de peças', onPress: onListaDePecas },
+      ],
+    },
     { rotulo: 'Desempenho', onPress: onDashboard },
     { rotulo: 'Importar clientes', onPress: onImportarClientes },
     ...(privilegiado
