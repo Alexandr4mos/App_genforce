@@ -209,6 +209,7 @@ create table fotos (
   checklist_resposta_id uuid references checklist_respostas(id) on delete cascade,
   os_id uuid references ordens_servico(id) on delete cascade,
   pendencia_id uuid references pendencias(id) on delete cascade,
+  relatorio_peca_id uuid references relatorio_pecas(id) on delete cascade,
   url text not null,
   legenda text,
   criado_em timestamptz default now()
@@ -227,7 +228,8 @@ create table relatorio_pecas (
   quantidade numeric default 1,
   observacao text,
   tecnico_id uuid references usuarios(id),
-  data_hora timestamptz default now()
+  data_hora timestamptz default now(),
+  proxima_troca_prevista date
 );
 
 -- ---------------------------------------------------------
@@ -253,6 +255,7 @@ create index idx_os_grupos_opcionais_os on os_grupos_opcionais(os_id);
 create index idx_pendencias_status on pendencias(status);
 create index idx_pendencias_equipamento on pendencias(equipamento_id);
 create index idx_relatorio_pecas_os on relatorio_pecas(os_id);
+create index idx_relatorio_pecas_equipamento on relatorio_pecas(equipamento_id);
 create index idx_equipamentos_unidade on equipamentos(unidade_id);
 
 -- =========================================================
