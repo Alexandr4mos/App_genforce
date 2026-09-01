@@ -48,6 +48,7 @@ export default function NovaOS({ onBack, onCriada }) {
     n_serie_alternador: '',
     placa_alternador: '',
     data_inicio_contrato: '',
+    periodicidade_manutencao: '',
   });
   const [novosFiltros, setNovosFiltros] = useState([]);
   const [salvandoEquipamento, setSalvandoEquipamento] = useState(false);
@@ -63,6 +64,7 @@ export default function NovaOS({ onBack, onCriada }) {
     nome: '',
     cnpj: '',
     telefone: '',
+    telefone_alternativo: '',
     email: '',
     email_alternativo: '',
     cidade: '',
@@ -172,6 +174,7 @@ export default function NovaOS({ onBack, onCriada }) {
         nome: novoCliente.nome.trim(),
         cnpj: novoCliente.cnpj?.trim() || null,
         telefone: novoCliente.telefone?.trim() || null,
+        telefone_alternativo: novoCliente.telefone_alternativo?.trim() || null,
         email: novoCliente.email?.trim() || null,
         email_alternativo: novoCliente.email_alternativo?.trim() || null,
         cidade: novoCliente.cidade?.trim() || null,
@@ -189,7 +192,7 @@ export default function NovaOS({ onBack, onCriada }) {
 
     setClientes((prev) => [...prev, data].sort((a, b) => a.nome.localeCompare(b.nome)));
     setClienteId(data.id);
-    setNovoCliente({ nome: '', cnpj: '', telefone: '', email: '', email_alternativo: '', cidade: '', uf: '' });
+    setNovoCliente({ nome: '', cnpj: '', telefone: '', telefone_alternativo: '', email: '', email_alternativo: '', cidade: '', uf: '' });
     setMostrarNovoCliente(false);
   }
 
@@ -271,6 +274,7 @@ export default function NovaOS({ onBack, onCriada }) {
         n_serie_alternador: novoEquipamento.n_serie_alternador?.trim() || null,
         placa_alternador: novoEquipamento.placa_alternador?.trim() || null,
         data_inicio_contrato: novoEquipamento.data_inicio_contrato?.trim() || null,
+        periodicidade_manutencao: novoEquipamento.periodicidade_manutencao?.trim() || null,
       })
       .select('id, tag, fabricante_gmg')
       .single();
@@ -318,6 +322,7 @@ export default function NovaOS({ onBack, onCriada }) {
       n_serie_alternador: '',
       placa_alternador: '',
       data_inicio_contrato: '',
+      periodicidade_manutencao: '',
     });
     setNovosFiltros([]);
     setMostrarNovoEquipamento(false);

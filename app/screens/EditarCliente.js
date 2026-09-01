@@ -11,7 +11,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { avisar } from '../lib/avisos';
 import { useTema } from '../lib/tema';
-import { cnpjValido, limparNumeros } from '../lib/mascaras';
+import { cnpjValido, limparNumeros, emailValido } from '../lib/mascaras';
 import SeletorCliente from '../components/SeletorCliente';
 import FormularioCliente from '../components/FormularioCliente';
 
@@ -20,7 +20,9 @@ const CAMPOS_VAZIOS = {
   razao_social: '',
   cnpj: '',
   telefone: '',
+  telefone_alternativo: '',
   email: '',
+  email_alternativo: '',
   cidade: '',
   uf: '',
 };
@@ -54,7 +56,7 @@ export default function EditarCliente({ onBack }) {
     setCarregando(true);
     const { data, error } = await supabase
       .from('clientes')
-      .select('nome, razao_social, cnpj, telefone, email, cidade, uf')
+      .select('nome, razao_social, cnpj, telefone, telefone_alternativo, email, email_alternativo, cidade, uf')
       .eq('id', id)
       .single();
     setCarregando(false);
@@ -69,7 +71,9 @@ export default function EditarCliente({ onBack }) {
       razao_social: data.razao_social || '',
       cnpj: data.cnpj || '',
       telefone: data.telefone || '',
+      telefone_alternativo: data.telefone_alternativo || '',
       email: data.email || '',
+      email_alternativo: data.email_alternativo || '',
       cidade: data.cidade || '',
       uf: data.uf || '',
     });
@@ -99,6 +103,14 @@ export default function EditarCliente({ onBack }) {
         'E-mail recomendado'
       );
     }
+    if (form.email?.trim() && !emailValido(form.email)) {
+      avisar('E-mail inválido. Verifique o formato.', 'Formato incorreto');
+      return;
+    }
+    if (form.email_alternativo?.trim() && !emailValido(form.email_alternativo)) {
+      avisar('E-mail alternativo inválido. Verifique o formato.', 'Formato incorreto');
+      return;
+    }
 
     setSalvando(true);
     const { error } = await supabase
@@ -108,7 +120,9 @@ export default function EditarCliente({ onBack }) {
         razao_social: form.razao_social?.trim() || null,
         cnpj: form.cnpj?.trim() || null,
         telefone: form.telefone?.trim() || null,
+        telefone_alternativo: form.telefone_alternativo?.trim() || null,
         email: form.email?.trim() || null,
+        email_alternativo: form.email_alternativo?.trim() || null,
         cidade: form.cidade?.trim() || null,
         uf: form.uf || null,
       })

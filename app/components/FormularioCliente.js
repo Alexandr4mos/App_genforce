@@ -44,6 +44,14 @@ export default function FormularioCliente({ valores, onChange, mostrarRazaoSocia
         onChangeText={(v) => onChange('telefone', mascararTelefone(v))}
         keyboardType="phone-pad"
       />
+      <TextInput
+        style={inputStyle}
+        placeholder="Telefone alternativo"
+        placeholderTextColor={cores.placeholder}
+        value={valores.telefone_alternativo || ''}
+        onChangeText={(v) => onChange('telefone_alternativo', mascararTelefone(v))}
+        keyboardType="phone-pad"
+      />
       <View>
         <TextInput
           style={inputStyle}
@@ -60,6 +68,15 @@ export default function FormularioCliente({ valores, onChange, mostrarRazaoSocia
           </Text>
         ) : null}
       </View>
+      <TextInput
+        style={inputStyle}
+        placeholder="E-mail alternativo"
+        placeholderTextColor={cores.placeholder}
+        value={valores.email_alternativo || ''}
+        onChangeText={(v) => onChange('email_alternativo', v)}
+        keyboardType="email-address"
+        autoCapitalize="none"
+      />
       <TextInput
         style={inputStyle}
         placeholder="Cidade"
