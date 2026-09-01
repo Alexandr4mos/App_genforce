@@ -51,6 +51,35 @@ export function corDoStatus(status) {
   return COR_STATUS[status] || '#9e9e9e';
 }
 
+export const PRIORIDADES_OS = [
+  { valor: 'alto', rotulo: 'Alto' },
+  { valor: 'medio', rotulo: 'Médio' },
+  { valor: 'baixo', rotulo: 'Baixo' },
+];
+
+export const COR_PRIORIDADE = {
+  alto: '#e53935',
+  medio: '#ffb300',
+  baixo: '#4caf50',
+};
+
+export function rotuloPrioridade(valor) {
+  return PRIORIDADES_OS.find((p) => p.valor === valor)?.rotulo || valor;
+}
+
+export function corDaPrioridade(prioridade) {
+  return COR_PRIORIDADE[prioridade] || COR_PRIORIDADE.medio;
+}
+
+/** Ordem de exibição: alto (0) → médio (1) → baixo (2). */
+export function pesoPrioridade(prioridade) {
+  const mapa = { alto: 0, medio: 1, baixo: 2 };
+  return mapa[prioridade] ?? 1;
+}
+
+/** Status em aberto para a aba Prioridade em Relatórios. */
+export const STATUS_OS_ABERTAS = ['agendado', 'pendente', 'andamento', 'pausada'];
+
 /**
  * Status exibido/filtrado no app — calculado a partir do fluxo (check-in/out,
  * finalização) e da data prevista vs. hoje. Não depende só do valor gravado no banco.
