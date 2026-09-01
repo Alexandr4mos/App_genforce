@@ -9,7 +9,7 @@ import {
   Button,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { TIPOS_OS, TEMPLATE_PADRAO_ID, statusEfetivo } from '../lib/constantes';
+import { TIPOS_OS, PRIORIDADES_OS, TEMPLATE_PADRAO_ID, statusEfetivo } from '../lib/constantes';
 import { useTema } from '../lib/tema';
 import { avisar } from '../lib/avisos';
 import SeletorCliente from '../components/SeletorCliente';
@@ -53,6 +53,7 @@ export default function NovaOS({ onBack, onCriada }) {
   const [salvandoEquipamento, setSalvandoEquipamento] = useState(false);
 
   const [tiposSelecionados, setTiposSelecionados] = useState({});
+  const [prioridade, setPrioridade] = useState('medio');
   const [dataPrevista, setDataPrevista] = useState('');
   const [descricao, setDescricao] = useState('');
   const [salvando, setSalvando] = useState(false);
@@ -63,6 +64,7 @@ export default function NovaOS({ onBack, onCriada }) {
     cnpj: '',
     telefone: '',
     email: '',
+    email_alternativo: '',
     cidade: '',
     uf: '',
   });
@@ -171,6 +173,7 @@ export default function NovaOS({ onBack, onCriada }) {
         cnpj: novoCliente.cnpj?.trim() || null,
         telefone: novoCliente.telefone?.trim() || null,
         email: novoCliente.email?.trim() || null,
+        email_alternativo: novoCliente.email_alternativo?.trim() || null,
         cidade: novoCliente.cidade?.trim() || null,
         uf: novoCliente.uf || null,
       })
@@ -186,7 +189,7 @@ export default function NovaOS({ onBack, onCriada }) {
 
     setClientes((prev) => [...prev, data].sort((a, b) => a.nome.localeCompare(b.nome)));
     setClienteId(data.id);
-    setNovoCliente({ nome: '', cnpj: '', telefone: '', email: '', cidade: '', uf: '' });
+    setNovoCliente({ nome: '', cnpj: '', telefone: '', email: '', email_alternativo: '', cidade: '', uf: '' });
     setMostrarNovoCliente(false);
   }
 
@@ -368,6 +371,7 @@ export default function NovaOS({ onBack, onCriada }) {
         }),
         data_inicio_prevista: dataConvertida,
         descricao: descricao.trim() || null,
+        prioridade,
       })
       .select('id')
       .single();
@@ -561,6 +565,22 @@ export default function NovaOS({ onBack, onCriada }) {
               <Text style={styles.novoEquipamentoBotaoTexto}>+ Cadastrar novo gerador</Text>
             </TouchableOpacity>
           )}
+
+          <Text style={[styles.label, { color: cores.texto }]}>Nível de prioridade</Text>
+          <View style={styles.tipoRow}>
+            {PRIORIDADES_OS.map((p) => (
+              <TouchableOpacity
+                key={p.valor}
+                style={[styles.tipoButton, prioridade === p.valor && styles.tipoButtonSelecionado]}
+                onPress={() => setPrioridade(p.valor)}
+              >
+                <Text style={prioridade === p.valor ? styles.tipoTextoSelecionado : styles.tipoTexto}>
+                  {prioridade === p.valor ? '✓ ' : ''}
+                  {p.rotulo}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           <Text style={[styles.label, { color: cores.texto }]}>Tipo de OS (marque um ou mais)</Text>
           <View style={styles.tipoRow}>

@@ -11,7 +11,7 @@ import {
   Switch,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { TIPOS_OS, STATUS_OS, TEMPLATE_PADRAO_ID } from '../lib/constantes';
+import { TIPOS_OS, STATUS_OS, PRIORIDADES_OS, TEMPLATE_PADRAO_ID } from '../lib/constantes';
 import { useTema } from '../lib/tema';
 import { avisar, confirmarAcao } from '../lib/avisos';
 import {
@@ -25,6 +25,7 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
   const [loading, setLoading] = useState(true);
   const [unidadeId, setUnidadeId] = useState(null);
   const [tiposSelecionados, setTiposSelecionados] = useState({});
+  const [prioridade, setPrioridade] = useState('medio');
   const [status, setStatus] = useState('pendente');
   const [descricao, setDescricao] = useState('');
   const [dataPrevista, setDataPrevista] = useState('');
@@ -84,7 +85,7 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
 
     const { data: os, error } = await supabase
       .from('ordens_servico')
-      .select('status, descricao, data_inicio_prevista, unidade_id')
+      .select('status, descricao, data_inicio_prevista, unidade_id, prioridade')
       .eq('id', osId)
       .single();
 
@@ -95,6 +96,7 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
     }
 
     setStatus(os.status || 'pendente');
+    setPrioridade(os.prioridade || 'medio');
     setDescricao(os.descricao || '');
     setUnidadeId(os.unidade_id);
     if (os.data_inicio_prevista) {
@@ -269,7 +271,12 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
 
     const { error } = await supabase
       .from('ordens_servico')
-      .update({ status, descricao: descricao.trim() || null, data_inicio_prevista: dataConvertida })
+      .update({
+        status,
+        descricao: descricao.trim() || null,
+        data_inicio_prevista: dataConvertida,
+        prioridade,
+      })
       .eq('id', osId);
 
     if (error) {
@@ -395,6 +402,26 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
             <Text style={tiposSelecionados[t.valor] ? styles.tipoTextoSelecionado : [styles.tipoTexto, { color: cores.texto }]}>
               {tiposSelecionados[t.valor] ? '✓ ' : ''}
               {t.rotulo}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <Text style={[styles.label, { color: cores.texto }]}>Nível de prioridade</Text>
+      <View style={styles.tipoRow}>
+        {PRIORIDADES_OS.map((p) => (
+          <TouchableOpacity
+            key={p.valor}
+            style={[styles.tipoButton, prioridade === p.valor && styles.tipoButtonSelecionado]}
+            onPress={() => setPrioridade(p.valor)}
+          >
+            <Text
+              style={
+                prioridade === p.valor ? styles.tipoTextoSelecionado : [styles.tipoTexto, { color: cores.texto }]
+              }
+            >
+              {prioridade === p.valor ? '✓ ' : ''}
+              {p.rotulo}
             </Text>
           </TouchableOpacity>
         ))}

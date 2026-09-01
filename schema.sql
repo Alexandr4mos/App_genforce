@@ -20,6 +20,7 @@ create table clientes (
   uf text,
   telefone text,
   email text,
+  email_alternativo text,
   ativo boolean default true,
   criado_em timestamptz default now()
 );
@@ -139,6 +140,7 @@ create table ordens_servico (
   enviado_cliente_em timestamptz,
   observacao_correcao text,
   importado boolean default false,
+  prioridade text not null default 'medio' check (prioridade in ('alto', 'medio', 'baixo')),
   criado_em timestamptz default now()
 );
 
@@ -250,6 +252,7 @@ create table assinaturas (
 -- =========================================================
 create index idx_os_status on ordens_servico(status);
 create index idx_os_cliente on ordens_servico(cliente_id);
+create index idx_os_prioridade on ordens_servico(prioridade);
 create index idx_os_tipos_os on os_tipos(os_id);
 create index idx_os_grupos_opcionais_os on os_grupos_opcionais(os_id);
 create index idx_pendencias_status on pendencias(status);
