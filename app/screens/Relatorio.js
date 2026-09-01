@@ -20,6 +20,7 @@ import {
 } from '../lib/constantes';
 import SeletorCliente from '../components/SeletorCliente';
 import CalendarioPlanejamento from '../components/CalendarioPlanejamento';
+import HistoricoPecas from '../components/HistoricoPecas';
 import DateRangeFilter from '../components/DateRangeFilter';
 import {
   limitesConsulta,
@@ -59,6 +60,7 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
   const [pendenciasResolvidas, setPendenciasResolvidas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [painelSuperior, setPainelSuperior] = useState('clientes');
+  const [secaoRelatorio, setSecaoRelatorio] = useState('lista');
 
   const privilegiado = papel === 'admin' || papel === 'supervisor';
 
@@ -365,6 +367,29 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
 
       <View style={styles.abasRow}>
         <TouchableOpacity
+          style={[styles.aba, secaoRelatorio === 'lista' && { backgroundColor: cores.primario }]}
+          onPress={() => setSecaoRelatorio('lista')}
+        >
+          <Text style={[styles.abaTexto, { color: secaoRelatorio === 'lista' ? '#fff' : cores.texto }]}>
+            Lista de OS
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.aba, secaoRelatorio === 'pecas' && { backgroundColor: cores.primario }]}
+          onPress={() => setSecaoRelatorio('pecas')}
+        >
+          <Text style={[styles.abaTexto, { color: secaoRelatorio === 'pecas' ? '#fff' : cores.texto }]}>
+            Peças
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {secaoRelatorio === 'pecas' ? (
+        <HistoricoPecas />
+      ) : (
+        <>
+      <View style={styles.abasRow}>
+        <TouchableOpacity
           style={[styles.aba, aba === 'busca' && { backgroundColor: cores.primario }]}
           onPress={() => setAba('busca')}
         >
@@ -558,6 +583,8 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
       ) : null}
 
       <View style={{ height: 40 }} />
+        </>
+      )}
     </ScrollView>
   );
 }
