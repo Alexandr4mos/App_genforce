@@ -15,8 +15,12 @@ import {
   STATUS_OS,
   rotuloTipo,
   rotuloStatus,
+  rotuloPrioridade,
   corDoStatus,
+  corDaPrioridade,
   statusEfetivo,
+  pesoPrioridade,
+  STATUS_OS_ABERTAS,
 } from '../lib/constantes';
 import SeletorCliente from '../components/SeletorCliente';
 import CalendarioPlanejamento from '../components/CalendarioPlanejamento';
@@ -59,7 +63,7 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
   const [filaRevisao, setFilaRevisao] = useState([]);
   const [pendenciasResolvidas, setPendenciasResolvidas] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [painelSuperior, setPainelSuperior] = useState('clientes');
+  const [painelSuperior, setPainelSuperior] = useState('calendario');
   const [secaoRelatorio, setSecaoRelatorio] = useState('lista');
 
   const privilegiado = papel === 'admin' || papel === 'supervisor';
@@ -148,7 +152,7 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
       let query = supabase
         .from('ordens_servico')
         .select(
-          `id, numero, status, descricao, data_inicio_prevista, data_fim_prevista, checkin_em, checkout_em, criado_em,
+          `id, numero, status, descricao, data_inicio_prevista, data_fim_prevista, checkin_em, checkout_em, criado_em, prioridade,
           clientes(nome, razao_social), os_tipos(tipo)`
         )
         .in('id', idsTipo)
@@ -185,7 +189,7 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
     let query = supabase
       .from('ordens_servico')
       .select(
-        `id, numero, status, descricao, data_inicio_prevista, data_fim_prevista, checkin_em, checkout_em, criado_em,
+        `id, numero, status, descricao, data_inicio_prevista, data_fim_prevista, checkin_em, checkout_em, criado_em, prioridade,
         clientes(nome, razao_social), os_tipos(tipo)`
       )
       .order('numero', { ascending: false });
@@ -301,10 +305,12 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
     setTiposSelecionados((prev) => ({ ...prev, [valor]: !prev[valor] }));
   }
 
-  function renderCardOS(os) {
+  function renderCardOS(os, { mostrarPrioridade = false } = {}) {
     const tipos = (os.os_tipos || []).map((t) => t.tipo);
     const dataRef = os.checkout_em || os.data_inicio_prevista || os.criado_em;
     const efetivo = statusEfetivo(os);
+    const nivel = os.prioridade || 'medio';
+    const corPrioridade = corDaPrioridade(nivel);
     return (
       <TouchableOpacity
         key={os.id}
@@ -313,8 +319,22 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
       >
         <View style={styles.cardHeader}>
           <Text style={[styles.cardNumero, { color: cores.texto }]}>OS #{os.numero}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: corDoStatus(efetivo) }]}>
-            <Text style={styles.statusBadgeTexto}>{rotuloStatus(efetivo)}</Text>
+          <View style={styles.cardBadges}>
+            {mostrarPrioridade ? (
+              <View style={[styles.prioridadeBadge, { backgroundColor: corPrioridade }]}>
+                <Text
+                  style={[
+                    styles.prioridadeBadgeTexto,
+                    { color: nivel === 'medio' ? '#333' : '#fff' },
+                  ]}
+                >
+                  {rotuloPrioridade(nivel)}
+                </Text>
+              </View>
+            ) : null}
+            <View style={[styles.statusBadge, { backgroundColor: corDoStatus(efetivo) }]}>
+              <Text style={styles.statusBadgeTexto}>{rotuloStatus(efetivo)}</Text>
+            </View>
           </View>
         </View>
         <Text style={[styles.cardCliente, { color: cores.texto }]}>
@@ -339,7 +359,24 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
   }
 
   const clienteAtual = clientes.find((c) => c.id === clienteId);
-  const listaAtual = aba === 'revisao' ? filaRevisao : resultados;
+
+  const listaExibida = useMemo(() => {
+    if (aba === 'revisao') return filaRevisao;
+    if (painelSuperior !== 'prioridade') return resultados;
+
+    const abertas = new Set(STATUS_OS_ABERTAS);
+    return [...resultados]
+      .filter((os) => abertas.has(statusEfetivo(os)))
+      .sort((a, b) => {
+        const diffPeso = pesoPrioridade(a.prioridade) - pesoPrioridade(b.prioridade);
+        if (diffPeso !== 0) return diffPeso;
+
+        const da = parsearDataOs(a.data_inicio_prevista)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        const db = parsearDataOs(b.data_inicio_prevista)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        return da - db;
+      });
+  }, [aba, painelSuperior, resultados, filaRevisao]);
+
   const temFiltroAtivo =
     filtroStatus ||
     tiposAtivosKey ||
@@ -415,26 +452,6 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
                 styles.chip,
                 {
                   borderColor: cores.primario,
-                  backgroundColor: painelSuperior === 'clientes' ? cores.primario : cores.fundoCard,
-                },
-              ]}
-              onPress={() => setPainelSuperior('clientes')}
-            >
-              <Text
-                style={{
-                  color: painelSuperior === 'clientes' ? '#fff' : cores.primario,
-                  fontSize: 12,
-                  fontWeight: '600',
-                }}
-              >
-                Clientes
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.chip,
-                {
-                  borderColor: cores.primario,
                   backgroundColor: painelSuperior === 'calendario' ? cores.primario : cores.fundoCard,
                 },
               ]}
@@ -450,21 +467,46 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
                 Calendário
               </Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.chip,
+                {
+                  borderColor: cores.primario,
+                  backgroundColor: painelSuperior === 'prioridade' ? cores.primario : cores.fundoCard,
+                },
+              ]}
+              onPress={() => setPainelSuperior('prioridade')}
+            >
+              <Text
+                style={{
+                  color: painelSuperior === 'prioridade' ? '#fff' : cores.primario,
+                  fontSize: 12,
+                  fontWeight: '600',
+                }}
+              >
+                Prioridade
+              </Text>
+            </TouchableOpacity>
           </View>
 
-          {painelSuperior === 'clientes' ? (
-            <SeletorCliente
-              clientes={clientes}
-              clienteId={clienteId}
-              onSelecionar={(c) => setClienteId(c.id)}
-            />
-          ) : (
+          {painelSuperior === 'calendario' ? (
             <CalendarioPlanejamento
               diaSelecionado={diaSelecionadoCalendario}
               onAlternarDia={alternarDiaCalendario}
               onLimparDia={limparFiltroDiaCalendario}
             />
+          ) : (
+            <Text style={[styles.subtitulo, { color: cores.textoSecundario }]}>
+              OS em aberto ordenadas por prioridade (Alto → Médio → Baixo) e data prevista.
+            </Text>
           )}
+
+          <Text style={[styles.label, { color: cores.texto }]}>Cliente</Text>
+          <SeletorCliente
+            clientes={clientes}
+            clienteId={clienteId}
+            onSelecionar={(c) => setClienteId(c.id)}
+          />
 
           <Text style={[styles.label, { color: cores.texto }]}>Status</Text>
           <View style={styles.chipsRow}>
@@ -533,7 +575,7 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
           {temFiltroAtivo ? (
             <View style={[styles.filtroAtivoBar, { backgroundColor: cores.primarioFundo }]}>
               <Text style={[styles.filtroAtivoTexto, { color: cores.primarioTexto }]}>
-                Filtrando: {rotulosFiltro.join(' · ')} — {resultados.length} OS
+                Filtrando: {rotulosFiltro.join(' · ')} — {listaExibida.length} OS
               </Text>
             </View>
           ) : null}
@@ -545,10 +587,14 @@ export default function Relatorio({ onBack, onAbrirOS, userId }) {
       )}
 
       {loading ? <ActivityIndicator style={{ marginVertical: 16 }} /> : null}
-      {!loading && listaAtual.length === 0 ? (
+      {!loading && listaExibida.length === 0 ? (
         <Text style={[styles.vazio, { color: cores.textoSuave }]}>Nenhuma OS encontrada.</Text>
       ) : null}
-      {!loading ? listaAtual.map(renderCardOS) : null}
+      {!loading
+        ? listaExibida.map((os) =>
+            renderCardOS(os, { mostrarPrioridade: aba === 'busca' && painelSuperior === 'prioridade' })
+          )
+        : null}
 
       {aba === 'busca' && clienteAtual ? (
         <>
@@ -606,9 +652,12 @@ const styles = StyleSheet.create({
   vazio: { fontStyle: 'italic', padding: 10 },
   card: { borderWidth: 2, borderRadius: 12, padding: 12, marginBottom: 10 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  cardNumero: { fontSize: 16, fontWeight: 'bold' },
+  cardBadges: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
+  cardNumero: { fontSize: 16, fontWeight: 'bold', flexShrink: 1 },
   statusBadge: { borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 },
   statusBadgeTexto: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  prioridadeBadge: { borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 },
+  prioridadeBadgeTexto: { fontSize: 11, fontWeight: '700' },
   cardCliente: { fontSize: 14, fontWeight: '600', marginBottom: 4 },
   cardDescricao: { fontSize: 13, marginBottom: 4 },
   tiposRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 4 },
