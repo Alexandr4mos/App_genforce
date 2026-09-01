@@ -31,6 +31,24 @@ function pathsParaSvg(paths, width, height) {
   </svg>`;
 }
 
+function redesenharCanvas(canvas, paths) {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, LARGURA, ALTURA);
+  ctx.strokeStyle = '#111111';
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  paths.forEach((stroke) => {
+    if (stroke.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(stroke[0].x, stroke[0].y);
+    for (let i = 1; i < stroke.length; i++) ctx.lineTo(stroke[i].x, stroke[i].y);
+    ctx.stroke();
+  });
+}
+
 export default function AssinaturaCampo({ titulo, assinatura, onSalvar, onExcluir, desabilitado }) {
   const { cores } = useTema();
   const [editando, setEditando] = useState(!assinatura);
@@ -51,15 +69,7 @@ export default function AssinaturaCampo({ titulo, assinatura, onSalvar, onExclui
 
   function limparCanvas() {
     if (Platform.OS === 'web' && canvasRef.current) {
-      const ctx = canvasRef.current.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, LARGURA, ALTURA);
-        ctx.strokeStyle = '#111111';
-        ctx.lineWidth = 2.5;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-      }
+      redesenharCanvas(canvasRef.current, []);
     }
   }
 
@@ -67,7 +77,9 @@ export default function AssinaturaCampo({ titulo, assinatura, onSalvar, onExclui
     desenhandoRef.current = true;
     const atual = [...pathsRef.current, [{ x, y }]];
     pathsRef.current = atual;
-    setPaths(atual);
+    if (Platform.OS !== 'web') {
+      setPaths(atual);
+    }
     if (Platform.OS === 'web' && canvasRef.current) {
       const ctx = canvasRef.current.getContext('2d');
       ctx.beginPath();
@@ -82,7 +94,9 @@ export default function AssinaturaCampo({ titulo, assinatura, onSalvar, onExclui
     if (!ultimo) return;
     ultimo.push({ x, y });
     pathsRef.current = atual;
-    setPaths(atual.map((s) => s.slice()));
+    if (Platform.OS !== 'web') {
+      setPaths(atual.map((s) => s.slice()));
+    }
 
     if (Platform.OS === 'web' && canvasRef.current) {
       const ctx = canvasRef.current.getContext('2d');
@@ -115,11 +129,20 @@ export default function AssinaturaCampo({ titulo, assinatura, onSalvar, onExclui
   ).current;
 
   function coordsDoEventoWeb(e) {
-    const rect = canvasRef.current.getBoundingClientRect();
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
     return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
     };
+  }
+
+  function vincularCanvas(el) {
+    if (canvasRef.current === el) return;
+    canvasRef.current = el;
+    if (el) limparCanvas();
   }
 
   useEffect(() => {
@@ -157,17 +180,16 @@ export default function AssinaturaCampo({ titulo, assinatura, onSalvar, onExclui
   }, [editando]);
 
   async function gerarBlob() {
+    const temTraço = pathsRef.current.some((s) => s.length > 1);
+    if (!temTraço) return null;
+
     if (Platform.OS === 'web' && canvasRef.current) {
-      const canvas = canvasRef.current;
-      const temTraço = pathsRef.current.some((s) => s.length > 1);
-      if (!temTraço) return null;
+      redesenharCanvas(canvasRef.current, pathsRef.current);
       return new Promise((resolve) => {
-        canvas.toBlob((blob) => resolve(blob), 'image/png');
+        canvasRef.current.toBlob((blob) => resolve(blob), 'image/png');
       }).then((blob) => ({ blob, contentType: 'image/png', extensao: 'png' }));
     }
 
-    const temTraço = pathsRef.current.some((s) => s.length > 1);
-    if (!temTraço) return null;
     const svg = pathsParaSvg(pathsRef.current, LARGURA, ALTURA);
     const blob = new Blob([svg], { type: 'image/svg+xml' });
     return { blob, contentType: 'image/svg+xml', extensao: 'svg' };
@@ -266,10 +288,7 @@ export default function AssinaturaCampo({ titulo, assinatura, onSalvar, onExclui
 
       {Platform.OS === 'web'
         ? createElement('canvas', {
-            ref: (el) => {
-              canvasRef.current = el;
-              if (el) limparCanvas();
-            },
+            ref: vincularCanvas,
             width: LARGURA,
             height: ALTURA,
             style: {
