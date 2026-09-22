@@ -14,6 +14,43 @@ import { useTema } from '../lib/tema';
 const FOTO_CAPA = require('../assets-login/foto-geradores-capa.jpg');
 const LOGO = require('../assets-login/genforce-logo-transparente.png');
 
+const GRADIENTE_WEB =
+  'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.04) 45%, rgba(0,0,0,0.32) 100%)';
+
+const GRADIENTE_FATIAS = 48;
+const GRADIENTE_MAX = 0.34;
+
+function opacidadeGradiente(t) {
+  return t * t * GRADIENTE_MAX;
+}
+
+function OverlayGradiente() {
+  if (Platform.OS === 'web') {
+    return <View style={styles.gradienteWeb} pointerEvents="none" />;
+  }
+
+  return (
+    <View style={styles.gradienteWrap} pointerEvents="none">
+      {Array.from({ length: GRADIENTE_FATIAS }, (_, i) => {
+        const t = (i + 0.5) / GRADIENTE_FATIAS;
+        return (
+          <View
+            key={i}
+            style={[
+              styles.gradienteFatia,
+              {
+                top: `${(i / GRADIENTE_FATIAS) * 100}%`,
+                height: `${100 / GRADIENTE_FATIAS}%`,
+                backgroundColor: `rgba(0,0,0,${opacidadeGradiente(t)})`,
+              },
+            ]}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
 export default function Login({
   usuario,
   password,
@@ -24,16 +61,15 @@ export default function Login({
   errorMsg,
 }) {
   const { cores, modoEscuro } = useTema();
-  const zoom = useRef(new Animated.Value(1)).current;
+  const zoom = useRef(new Animated.Value(1.06)).current;
   const fade = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(36)).current;
-  const brilho = useRef(new Animated.Value(-1)).current;
 
   const usaDriverNativo = Platform.OS !== 'web';
 
   useEffect(() => {
     Animated.timing(zoom, {
-      toValue: 1.12,
+      toValue: 1.14,
       duration: 16000,
       useNativeDriver: usaDriverNativo,
     }).start();
@@ -42,35 +78,19 @@ export default function Login({
       Animated.timing(fade, { toValue: 1, duration: 900, useNativeDriver: usaDriverNativo }),
       Animated.timing(slide, { toValue: 0, duration: 900, useNativeDriver: usaDriverNativo }),
     ]).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(brilho, { toValue: 1, duration: 1400, useNativeDriver: usaDriverNativo }),
-        Animated.delay(2600),
-        Animated.timing(brilho, { toValue: -1, duration: 0, useNativeDriver: usaDriverNativo }),
-      ])
-    ).start();
-  }, [brilho, fade, slide, zoom, usaDriverNativo]);
-
-  const brilhoX = brilho.interpolate({
-    inputRange: [-1, 1],
-    outputRange: [-90, 250],
-  });
+  }, [fade, slide, zoom, usaDriverNativo]);
 
   return (
     <View style={styles.tela}>
-      <Animated.Image
-        source={FOTO_CAPA}
-        style={[styles.fundo, { transform: [{ scale: zoom }] }]}
-        resizeMode="cover"
-      />
-
-      <View style={styles.gradienteWrap}>
-        <View style={[styles.gradienteFaixa, { bottom: '42%', opacity: 0.12 }]} />
-        <View style={[styles.gradienteFaixa, { bottom: 0, height: '55%', opacity: 0.28 }]} />
-        <View style={[styles.gradienteFaixa, { bottom: 0, height: '38%', opacity: 0.42 }]} />
-        <View style={[styles.gradienteFaixa, { bottom: 0, height: '22%', opacity: 0.55 }]} />
+      <View style={styles.fundoWrap}>
+        <Animated.Image
+          source={FOTO_CAPA}
+          style={[styles.fundo, { transform: [{ scale: zoom }] }]}
+          resizeMode="cover"
+        />
       </View>
+
+      <OverlayGradiente />
 
       <Animated.View
         style={[
@@ -83,9 +103,6 @@ export default function Login({
             <Image source={LOGO} style={styles.logoImg} resizeMode="contain" />
           </View>
           <Text style={styles.logoSub}>MANUTENÇÃO</Text>
-          <Animated.View
-            style={[styles.brilho, { transform: [{ translateX: brilhoX }, { rotate: '18deg' }] }]}
-          />
         </View>
 
         <TextInput
@@ -126,21 +143,35 @@ export default function Login({
 
 const styles = StyleSheet.create({
   tela: { flex: 1, backgroundColor: '#000', overflow: 'hidden' },
-  fundo: {
+  fundoWrap: {
     ...StyleSheet.absoluteFillObject,
-    width: '100%',
-    height: '100%',
+    overflow: 'hidden',
+    backgroundColor: '#000',
+  },
+  fundo: {
+    position: 'absolute',
+    top: '-10%',
+    left: '-10%',
+    width: '120%',
+    height: '120%',
+    ...(Platform.OS === 'web'
+      ? {
+          objectFit: 'cover',
+          objectPosition: 'center center',
+        }
+      : null),
   },
   gradienteWrap: {
     ...StyleSheet.absoluteFillObject,
-    pointerEvents: 'none',
   },
-  gradienteFaixa: {
+  gradienteWeb: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundImage: GRADIENTE_WEB,
+  },
+  gradienteFatia: {
     position: 'absolute',
     left: 0,
     right: 0,
-    height: '20%',
-    backgroundColor: '#000',
   },
   conteudo: {
     flex: 1,
@@ -173,14 +204,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 4.2,
     fontWeight: '600',
-  },
-  brilho: {
-    position: 'absolute',
-    top: -20,
-    bottom: -20,
-    width: 36,
-    backgroundColor: 'rgba(255,255,255,0.28)',
-    pointerEvents: 'none',
   },
   pilula: {
     width: '100%',

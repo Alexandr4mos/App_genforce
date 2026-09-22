@@ -24,7 +24,19 @@ export function rotuloPapel(papel) {
   return papel || '—';
 }
 
-/** Normaliza login digitado no cadastro (sem @). */
+/** Normaliza login digitado no cadastro (sem @): minúsculas, sem acentos, só [a-z0-9._-]. */
 export function normalizarLoginUsuario(texto) {
-  return (texto || '').trim().toLowerCase().replace(/@.*/, '');
+  return (texto || '')
+    .trim()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/@.*/, '')
+    .replace(/[^a-z0-9._-]/g, '');
+}
+
+/** Primeira palavra do nome completo como sugestão de login. */
+export function loginSugeridoDeNome(nome) {
+  const primeira = (nome || '').trim().split(/\s+/)[0] || '';
+  return normalizarLoginUsuario(primeira);
 }

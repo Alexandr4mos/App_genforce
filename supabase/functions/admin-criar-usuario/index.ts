@@ -15,6 +15,16 @@ function respostaJson(corpo: Record<string, unknown>, status = 200) {
   });
 }
 
+function normalizarLoginUsuario(texto: string): string {
+  return String(texto || "")
+    .trim()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/@.*/, "")
+    .replace(/[^a-z0-9._-]/g, "");
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -66,7 +76,7 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json();
     const nome = String(body.nome || "").trim();
-    const usuario = String(body.usuario || "").trim().toLowerCase().replace(/@.*/, "");
+    const usuario = normalizarLoginUsuario(String(body.usuario || ""));
     const papel = body.papel === "admin" ? "admin" : "tecnico";
     const senha = String(body.senha || "");
 
@@ -76,7 +86,7 @@ Deno.serve(async (req: Request) => {
 
     if (!/^[a-z0-9._-]+$/.test(usuario)) {
       return respostaJson(
-        { error: "Usuário inválido. Use apenas letras, números, ponto, hífen ou underline." },
+        { error: "Usuário inválido após normalização. Use letras, números, ponto, hífen ou underline." },
         400,
       );
     }

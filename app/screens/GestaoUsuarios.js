@@ -13,7 +13,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { avisar, confirmarAcao } from '../lib/avisos';
 import { useTema } from '../lib/tema';
-import { PAPEIS_USUARIO, rotuloPapel, normalizarLoginUsuario, ehPrivilegiado } from '../lib/auth';
+import { PAPEIS_USUARIO, rotuloPapel, normalizarLoginUsuario, loginSugeridoDeNome, ehPrivilegiado } from '../lib/auth';
 
 const FORM_VAZIO = { nome: '', usuario: '', papel: 'tecnico', senha: '' };
 
@@ -68,6 +68,18 @@ export default function GestaoUsuarios({ onBack, userId }) {
     setForm(FORM_VAZIO);
     setErroForm('');
     setFormAberto(false);
+  }
+
+  function alterarUsuarioLogin(texto) {
+    setForm((p) => ({ ...p, usuario: normalizarLoginUsuario(texto) }));
+  }
+
+  function aoSairCampoNome() {
+    setForm((p) => {
+      if (p.usuario.trim()) return p;
+      const sugerido = loginSugeridoDeNome(p.nome);
+      return sugerido ? { ...p, usuario: sugerido } : p;
+    });
   }
 
   async function criarUsuario() {
@@ -228,9 +240,6 @@ export default function GestaoUsuarios({ onBack, userId }) {
                   <Text style={styles.statusBadgeTexto}>{u.ativo ? 'Ativo' : 'Inativo'}</Text>
                 </View>
               </View>
-              <Text style={[styles.cardPapel, { color: cores.textoSecundario }]}>
-                Papel: {rotuloPapel(u.papel)}
-              </Text>
 
               <View style={styles.acoesRow}>
                 <TouchableOpacity
@@ -277,6 +286,7 @@ export default function GestaoUsuarios({ onBack, userId }) {
               style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto }]}
               value={form.nome}
               onChangeText={(v) => setForm((p) => ({ ...p, nome: v }))}
+              onBlur={aoSairCampoNome}
               placeholder="Ex.: Marcelo Silva"
               placeholderTextColor={cores.placeholder}
             />
@@ -285,12 +295,17 @@ export default function GestaoUsuarios({ onBack, userId }) {
             <TextInput
               style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto }]}
               value={form.usuario}
-              onChangeText={(v) => setForm((p) => ({ ...p, usuario: v }))}
+              onChangeText={alterarUsuarioLogin}
               placeholder="Ex.: marcelo"
               placeholderTextColor={cores.placeholder}
               autoCapitalize="none"
               autoCorrect={false}
             />
+            {form.usuario ? (
+              <Text style={[styles.loginPreview, { color: cores.textoSecundario }]}>
+                Login interno: {form.usuario}
+              </Text>
+            ) : null}
 
             <Text style={[styles.label, { color: cores.texto }]}>Papel</Text>
             <View style={styles.papelRow}>
@@ -383,12 +398,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 10,
   },
   cardNome: { fontSize: 16, fontWeight: '700', flex: 1, marginRight: 8 },
   statusBadge: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
   statusBadgeTexto: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  cardPapel: { fontSize: 13, marginBottom: 10 },
   acoesRow: { flexDirection: 'row', gap: 8 },
   acaoBtn: {
     flex: 1,
@@ -418,6 +432,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 15,
   },
+  loginPreview: { fontSize: 12, marginTop: 4, marginBottom: 2 },
   papelRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   papelChip: {
     borderWidth: 1,
