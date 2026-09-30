@@ -84,22 +84,25 @@ export const STATUS_OS_ABERTAS = ['agendado', 'pendente', 'andamento', 'pausada'
  * Status exibido/filtrado no app.
  *
  * Regras (em ordem):
- * 1. finalizado / concluida (banco ou checkout) — sempre respeitados
- * 2. pausada gravada no banco (pausa manual via Editar OS) — respeitada
- * 3. com check-in: se data prevista já passou → pausada (automático); senão → andamento
- * 4. sem check-in: data futura → agendado; caso contrário → pendente
+ * 1. finalizado / concluida (status do banco) — sempre respeitados
+ * 2. checkout_em implica concluída, EXCETO se status foi devolvido para
+ *    andamento/pausada (ciclo "Solicitar correção")
+ * 3. pausada gravada no banco (pausa manual via Editar OS) — respeitada
+ * 4. com check-in: se data prevista já passou → pausada (automático); senão → andamento
+ * 5. sem check-in: data futura → agendado; caso contrário → pendente
  *
  * Não há trigger/cron no Supabase para isso — só esta função no client.
- * Por isso salvar status="pausada" e depois filtrar/exibir pelo valor bruto do banco
- * "parece" não persistir: as listas usam statusEfetivo, que antes ignorava pausada manual.
  */
 export function statusEfetivo(os) {
   if (!os) return 'pendente';
 
   if (os.status === 'finalizado') return 'finalizado';
-  if (os.checkout_em || os.status === 'concluida') return 'concluida';
+  if (os.status === 'concluida') return 'concluida';
 
-  // Pausa manual (Editar OS → Status → Pausada) deve aparecer após refetch.
+  // Devolvida para correção: status andamento/pausada prevalece sobre checkout_em antigo.
+  const devolvidaParaCorrecao = os.status === 'andamento' || os.status === 'pausada';
+  if (os.checkout_em && !devolvidaParaCorrecao) return 'concluida';
+
   if (os.status === 'pausada') return 'pausada';
 
   const hoje = hojeNoTimezone();

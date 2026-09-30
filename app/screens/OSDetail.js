@@ -1277,6 +1277,25 @@ export default function OSDetail({ osId, userId, onBack }) {
         return;
       }
 
+      // Ciclo "Solicitar correção": devolve a OS para a fila de revisão do supervisor.
+      const devolvidaParaCorrecao =
+        Boolean(osInfo?.observacao_correcao) &&
+        osInfo?.status !== 'concluida' &&
+        osInfo?.status !== 'finalizado';
+
+      if (devolvidaParaCorrecao) {
+        const { error: erroRevisao } = await supabase
+          .from('ordens_servico')
+          .update({ status: 'concluida' })
+          .eq('id', osId);
+        if (erroRevisao) throw erroRevisao;
+        setOsInfo((prev) => (prev ? { ...prev, status: 'concluida' } : prev));
+        setStatusSalvamento('salvo');
+        recomputarRelatorioSalvo();
+        avisar('Relatório corrigido enviado para revisão do supervisor.', 'Sucesso');
+        return;
+      }
+
       setStatusSalvamento('salvo');
       recomputarRelatorioSalvo();
       avisar('Relatório salvo com sucesso! Check-out liberado.', 'Sucesso');
@@ -1303,6 +1322,7 @@ export default function OSDetail({ osId, userId, onBack }) {
           aprovado_supervisor: true,
           aprovado_por: userId,
           aprovado_em: new Date().toISOString(),
+          observacao_correcao: null,
         })
         .eq('id', osId);
 
@@ -1317,6 +1337,7 @@ export default function OSDetail({ osId, userId, onBack }) {
         aprovado_supervisor: true,
         aprovado_por: userId,
         aprovado_em: new Date().toISOString(),
+        observacao_correcao: null,
       }));
 
       await abrirRelatorioParaImpressao(osId);
@@ -1340,6 +1361,8 @@ export default function OSDetail({ osId, userId, onBack }) {
     const { error } = await supabase
       .from('ordens_servico')
       .update({
+        // Volta para o técnico; checkout_em permanece (histórico), mas status
+        // andamento tira a OS da fila "Aguardando revisão" até o próximo save completo.
         status: 'andamento',
         observacao_correcao: textoCorrecao.trim(),
         aprovado_supervisor: false,
@@ -1356,6 +1379,7 @@ export default function OSDetail({ osId, userId, onBack }) {
       ...prev,
       status: 'andamento',
       observacao_correcao: textoCorrecao.trim(),
+      aprovado_supervisor: false,
     }));
     setMostrarCorrecao(false);
     setTextoCorrecao('');
