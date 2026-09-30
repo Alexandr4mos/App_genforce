@@ -141,6 +141,8 @@ export default function OSDetail({ osId, userId, onBack }) {
   const osEquipamentosRef = useRef([]);
   const gruposOpcionaisRef = useRef(new Set());
   const respostaIdsRef = useRef({});
+  /** Fila serial: evita corrida entre debounce de item e "Salvar Relatório". */
+  const filaEscritaChecklistRef = useRef(Promise.resolve());
 
   useEffect(() => {
     respostasRef.current = respostas;
@@ -657,8 +659,40 @@ export default function OSDetail({ osId, userId, onBack }) {
     return data.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
   }
 
-  async function salvarRespostasEmLote(pares) {
-    if (!osInfo?.checkin_em || !pares?.length) return [];
+  function enfileirarEscritaChecklist(fn) {
+    const executado = filaEscritaChecklistRef.current.then(fn, fn);
+    // Não deixa rejeição travar a fila para as próximas escritas.
+    filaEscritaChecklistRef.current = executado.catch(() => {});
+    return executado;
+  }
+
+  function ehErroLinhaUnica(err) {
+    const msg = String(err?.message || err || '');
+    const codigo = err?.code || '';
+    return (
+      codigo === 'PGRST116' ||
+      /multiple \(or no\) rows returned/i.test(msg) ||
+      /JSON object requested/i.test(msg)
+    );
+  }
+
+  async function comRetryLinhaUnica(fn, { tentativas = 2 } = {}) {
+    let ultimoErro = null;
+    for (let i = 0; i < tentativas; i++) {
+      try {
+        return await fn();
+      } catch (err) {
+        ultimoErro = err;
+        if (!ehErroLinhaUnica(err) || i === tentativas - 1) throw err;
+        await new Promise((r) => setTimeout(r, 200 * (i + 1)));
+      }
+    }
+    throw ultimoErro;
+  }
+
+  /** Núcleo do upsert (sem fila) — usar só de dentro de enfileirarEscritaChecklist. */
+  async function upsertRespostasCore(pares) {
+    if (!pares?.length) return [];
 
     const agora = new Date().toISOString();
     const rows = pares.map((p) => ({
@@ -670,23 +704,42 @@ export default function OSDetail({ osId, userId, onBack }) {
       respondido_por: userId || null,
     }));
 
-    const { data, error } = await supabase
-      .from('checklist_respostas')
-      .upsert(rows, { onConflict: 'os_equipamento_id,template_item_id' })
-      .select('id, os_equipamento_id, template_item_id');
+    // Sem .select()/.single() no upsert — evita PGRST116 em corridas.
+    const { error: erroUpsert } = await supabase.from('checklist_respostas').upsert(rows, {
+      onConflict: 'os_equipamento_id,template_item_id',
+      ignoreDuplicates: false,
+    });
+    if (erroUpsert) throw erroUpsert;
 
-    if (error) throw error;
+    const osEqIds = [...new Set(pares.map((p) => p.osEquipamentoId))];
+    const templateIds = [...new Set(pares.map((p) => p.templateItemId))];
+    const { data, error: erroSelect } = await supabase
+      .from('checklist_respostas')
+      .select('id, os_equipamento_id, template_item_id')
+      .in('os_equipamento_id', osEqIds)
+      .in('template_item_id', templateIds);
+    if (erroSelect) throw erroSelect;
+
+    const chavePar = new Set(pares.map((p) => `${p.osEquipamentoId}:${p.templateItemId}`));
+    const relevantes = (data || []).filter((r) =>
+      chavePar.has(`${r.os_equipamento_id}:${r.template_item_id}`)
+    );
 
     setRespostaIds((prev) => {
       const next = { ...prev };
-      (data || []).forEach((r) => {
+      relevantes.forEach((r) => {
         next[chave(r.os_equipamento_id, r.template_item_id)] = r.id;
       });
       respostaIdsRef.current = next;
       return next;
     });
 
-    return data || [];
+    return relevantes;
+  }
+
+  async function salvarRespostasEmLote(pares) {
+    if (!osInfo?.checkin_em || !pares?.length) return [];
+    return enfileirarEscritaChecklist(() => comRetryLinhaUnica(() => upsertRespostasCore(pares)));
   }
 
   async function garantirRespostaSalva(osEquipamentoId, templateItemId, overrides = {}) {
@@ -700,26 +753,30 @@ export default function OSDetail({ osId, userId, onBack }) {
         ? overrides.observacao
         : observacoesRef.current[k] || null;
 
-    // Preferência: PATCH direto quando já conhecemos o id (1 request, sem GET).
-    const idConhecido = respostaIdsRef.current[k];
-    if (idConhecido) {
-      const { error } = await supabase
-        .from('checklist_respostas')
-        .update({
-          resposta: valor,
-          observacao: observacao?.trim() ? observacao.trim() : null,
-          respondido_em: new Date().toISOString(),
-          respondido_por: userId || null,
-        })
-        .eq('id', idConhecido);
-      if (error) throw error;
-      return idConhecido;
-    }
+    return enfileirarEscritaChecklist(() =>
+      comRetryLinhaUnica(async () => {
+        const idConhecido = respostaIdsRef.current[k];
+        if (idConhecido) {
+          const { data: atualizados, error } = await supabase
+            .from('checklist_respostas')
+            .update({
+              resposta: valor,
+              observacao: observacao?.trim() ? observacao.trim() : null,
+              respondido_em: new Date().toISOString(),
+              respondido_por: userId || null,
+            })
+            .eq('id', idConhecido)
+            .select('id');
+          if (error) throw error;
+          if (atualizados?.length) return idConhecido;
+        }
 
-    const [salva] = await salvarRespostasEmLote([
-      { osEquipamentoId, templateItemId, valor, observacao },
-    ]);
-    return salva?.id || null;
+        const salvas = await upsertRespostasCore([
+          { osEquipamentoId, templateItemId, valor, observacao },
+        ]);
+        return salvas?.[0]?.id || respostaIdsRef.current[k] || null;
+      })
+    );
   }
 
   async function executarSalvamento(fn, chaveRetry = null) {
@@ -1345,6 +1402,7 @@ export default function OSDetail({ osId, userId, onBack }) {
 
     try {
       // Cancela debounces pendentes — o lote abaixo já persiste o estado atual.
+      // A fila serial ainda espera escritas already in-flight antes do upsert em lote.
       Object.keys(debounceTimers.current).forEach((k) => {
         clearTimeout(debounceTimers.current[k]);
         delete debounceTimers.current[k];
@@ -1365,13 +1423,27 @@ export default function OSDetail({ osId, userId, onBack }) {
         });
       });
 
-      await salvarRespostasEmLote(pares);
-
-      await salvarCamposOs({
-        observacoes_gerais: observacaoGeralRef.current,
-        km_saida: kmSaidaRef.current === '' ? null : Number(kmSaidaRef.current),
-        km_retorno: kmRetornoRef.current === '' ? null : Number(kmRetornoRef.current),
-      });
+      // Retry silencioso 1x em qualquer falha transitória (ex. PGRST116 em corrida).
+      let ultimoErroSalvarRelatorio = null;
+      for (let tentativa = 0; tentativa < 2; tentativa++) {
+        try {
+          await salvarRespostasEmLote(pares);
+          await salvarCamposOs({
+            observacoes_gerais: observacaoGeralRef.current,
+            km_saida: kmSaidaRef.current === '' ? null : Number(kmSaidaRef.current),
+            km_retorno: kmRetornoRef.current === '' ? null : Number(kmRetornoRef.current),
+          });
+          ultimoErroSalvarRelatorio = null;
+          break;
+        } catch (err) {
+          ultimoErroSalvarRelatorio = err;
+          if (tentativa === 0) {
+            await new Promise((r) => setTimeout(r, 300));
+            continue;
+          }
+        }
+      }
+      if (ultimoErroSalvarRelatorio) throw ultimoErroSalvarRelatorio;
 
       const faltando = [];
       osEquipamentos.forEach((eq) => {
