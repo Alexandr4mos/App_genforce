@@ -280,10 +280,6 @@ export default function GestaoUsuarios({ onBack, userId }) {
   return (
     <View style={[styles.container, { backgroundColor: cores.fundo }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={[styles.backText, { color: cores.primario }]}>{'< Voltar'}</Text>
-        </TouchableOpacity>
-
         <Text style={[styles.title, { color: cores.texto }]}>Gestão de usuários</Text>
         <Text style={[styles.subtitulo, { color: cores.textoSecundario }]}>
           Cadastre contas da equipe e ajuste papéis de acesso.
@@ -629,11 +625,11 @@ export default function GestaoUsuarios({ onBack, userId }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 40 },
+  container: { flex: 1, width: '100%', maxWidth: 1100, alignSelf: 'center', paddingTop: 24 },
   scrollContent: { paddingHorizontal: 20 },
   backButton: { marginBottom: 10 },
   backText: { fontSize: 16 },
-  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 6 },
+  title: { fontSize: 24, fontWeight: '700', letterSpacing: -0.3, marginBottom: 6 },
   subtitulo: { fontSize: 13, marginBottom: 16 },
   botaoNovo: {
     borderRadius: 10,

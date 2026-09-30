@@ -148,11 +148,7 @@ export default function EditarCliente({ onBack }) {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: cores.fundo }]}>
-      <TouchableOpacity onPress={onBack} style={styles.backButton}>
-        <Text style={[styles.backText, { color: cores.primario }]}>{'< Voltar'}</Text>
-      </TouchableOpacity>
-
-      <Text style={[styles.title, { color: cores.texto }]}>Editar cliente</Text>
+      <Text style={[styles.title, { color: cores.texto }]}>Clientes</Text>
       <Text style={[styles.subtitulo, { color: cores.textoSecundario }]}>
         Corrija CNPJ, telefone, e-mail e endereço dos clientes importados ou cadastrados.
       </Text>
@@ -180,10 +176,10 @@ export default function EditarCliente({ onBack }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 40, paddingHorizontal: 20 },
+  container: { flex: 1, width: '100%', maxWidth: 1100, alignSelf: 'center', paddingTop: 24, paddingHorizontal: 16 },
   backButton: { marginBottom: 10 },
   backText: { fontSize: 16 },
-  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 6 },
+  title: { fontSize: 24, fontWeight: '700', letterSpacing: -0.3, marginBottom: 6 },
   subtitulo: { fontSize: 13, marginBottom: 16 },
   label: { fontSize: 14, fontWeight: 'bold', marginTop: 8, marginBottom: 8 },
 });

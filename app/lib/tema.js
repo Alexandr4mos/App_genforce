@@ -66,6 +66,9 @@ export const TEMAS = {
   },
 };
 
+// Cor de marca estática, para StyleSheets que não acessam o tema (equivale a cores.primario no claro).
+export const COR_MARCA = '#2F55E8';
+
 // Escalas não-cromáticas (iguais nos dois temas).
 export const RAIO = { sm: 8, md: 12, lg: 16, pill: 999 };
 export const ESPACO = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };

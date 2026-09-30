@@ -27,6 +27,7 @@ import SecaoPecasTrocadas from '../components/SecaoPecasTrocadas';
 import SecaoColapsavel from '../components/SecaoColapsavel';
 import { uriParaBlobJpeg, extensaoDeContentType } from '../lib/fotosUpload';
 import { normalizarNomeResponsavel } from '../lib/assinaturas';
+import { COR_MARCA } from '../lib/tema';
 
 // Chave composta: cada resposta pertence a um gerador (os_equipamento) + item específico.
 // Usar só o id do item causava "vazamento" de resposta entre GMG 01 e GMG 02 quando
@@ -2545,7 +2546,7 @@ export default function OSDetail({ osId, userId, onBack }) {
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 40, paddingHorizontal: 20, backgroundColor: '#fff' },
   backButton: { marginBottom: 10 },
-  backText: { color: '#007AFF', fontSize: 16 },
+  backText: { color: COR_MARCA, fontSize: 16 },
   tituloRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2554,7 +2555,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 22, fontWeight: 'bold', flex: 1 },
   atualizarBotao: { paddingHorizontal: 10, paddingVertical: 4, minWidth: 36, alignItems: 'center' },
-  atualizarTexto: { fontSize: 22, color: '#007AFF' },
+  atualizarTexto: { fontSize: 22, color: COR_MARCA },
   statusSalvamentoRow: { marginBottom: 12 },
   statusSalvamentoTexto: { fontSize: 13, fontWeight: '600' },
   equipamentoBlock: { marginBottom: 24 },
@@ -2601,14 +2602,14 @@ const styles = StyleSheet.create({
   fotoBotao: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: COR_MARCA,
     borderRadius: 8,
     paddingVertical: 8,
     alignItems: 'center',
     marginRight: 8,
   },
-  fotoBotaoCamera: { backgroundColor: '#007AFF' },
-  fotoBotaoTexto: { color: '#007AFF', fontWeight: '600' },
+  fotoBotaoCamera: { backgroundColor: COR_MARCA },
+  fotoBotaoTexto: { color: COR_MARCA, fontWeight: '600' },
   fotoBotaoTextoCamera: { color: '#fff', fontWeight: '600' },
   avisoSalvarPrimeiro: { fontSize: 12, color: '#999', marginTop: 8, fontStyle: 'italic' },
   fotosSectionMini: {
@@ -2623,7 +2624,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -6,
     left: -6,
-    backgroundColor: '#007AFF',
+    backgroundColor: COR_MARCA,
     width: 18,
     height: 18,
     borderRadius: 9,
@@ -2659,7 +2660,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: COR_MARCA,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
@@ -2708,13 +2709,13 @@ const styles = StyleSheet.create({
   prioridadeRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
   novaPendenciaBotao: {
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: COR_MARCA,
     borderRadius: 8,
     paddingVertical: 8,
     alignItems: 'center',
     marginTop: 4,
   },
-  novaPendenciaBotaoTexto: { color: '#007AFF', fontWeight: '600' },
+  novaPendenciaBotaoTexto: { color: COR_MARCA, fontWeight: '600' },
   diasAbertaTexto: { fontSize: 12, color: '#666', marginBottom: 6, fontStyle: 'italic' },
   observacaoInput: {
     borderWidth: 1,
@@ -2740,12 +2741,12 @@ const styles = StyleSheet.create({
     height: 26,
     borderRadius: 13,
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: COR_MARCA,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
   },
-  editarPendenciaTexto: { color: '#007AFF', fontSize: 13 },
+  editarPendenciaTexto: { color: COR_MARCA, fontSize: 13 },
   confirmarEdicaoButton: {
     width: 26,
     height: 26,
@@ -2757,7 +2758,7 @@ const styles = StyleSheet.create({
   },
   confirmarEdicaoTexto: { color: '#fff', fontWeight: 'bold' },
   salvarRelatorioBotao: {
-    backgroundColor: '#007AFF',
+    backgroundColor: COR_MARCA,
     borderRadius: 8,
     paddingVertical: 16,
     alignItems: 'center',

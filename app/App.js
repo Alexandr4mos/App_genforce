@@ -184,7 +184,7 @@ function AppInterno() {
   const itensNav = [
     { id: 'os', rotulo: 'Ordens de Serviço', rotuloCurto: 'Ordens', icone: 'list', principal: true, onPress: navegar('os') },
     { id: 'painel', rotulo: 'Painel', icone: 'chart', principal: true, onPress: navegar('painel') },
-    { id: 'relatorio', rotulo: 'Relatório de OS', rotuloCurto: 'Relatório', icone: 'file', principal: true, onPress: navegar('relatorio') },
+    { id: 'relatorio', rotulo: 'Lista de OS', rotuloCurto: 'Lista', icone: 'file', principal: true, onPress: navegar('relatorio') },
     { id: 'pecas', rotulo: 'Lista de peças', icone: 'package', onPress: navegar('pecas') },
     { id: 'clientes', rotulo: 'Clientes', icone: 'building', onPress: navegar('clientes') },
     { id: 'importar', rotulo: 'Importar clientes', icone: 'upload', onPress: navegar('importar') },

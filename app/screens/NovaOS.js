@@ -18,6 +18,7 @@ import FormularioCliente from '../components/FormularioCliente';
 import FormularioEquipamento from '../components/FormularioEquipamento';
 import { cnpjValido, limparNumeros } from '../lib/mascaras';
 import { gruposOpcionaisPadraoNovaOs, salvarGruposOpcionais } from '../lib/gruposOS';
+import { COR_MARCA } from '../lib/tema';
 
 export default function NovaOS({ onBack, onCriada }) {
   const { cores } = useTema();
@@ -791,12 +792,12 @@ export default function NovaOS({ onBack, onCriada }) {
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 40, paddingHorizontal: 20, backgroundColor: '#fff' },
   backButton: { marginBottom: 10 },
-  backText: { color: '#007AFF', fontSize: 16 },
+  backText: { color: COR_MARCA, fontSize: 16 },
   title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20 },
   label: { fontSize: 14, fontWeight: 'bold', marginTop: 16, marginBottom: 8 },
   listaBox: { borderWidth: 1, borderColor: '#eee', borderRadius: 8, padding: 4 },
   itemLista: { paddingVertical: 10, paddingHorizontal: 10, borderRadius: 6 },
-  itemListaSelecionado: { backgroundColor: '#007AFF' },
+  itemListaSelecionado: { backgroundColor: COR_MARCA },
   itemListaTexto: { color: '#333' },
   itemListaTextoSelecionado: { color: '#fff', fontWeight: 'bold' },
   avisoVazio: { color: '#999', fontStyle: 'italic', padding: 10, fontSize: 13 },
@@ -813,10 +814,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxMarcado: { backgroundColor: '#007AFF', borderColor: '#007AFF' },
+  checkboxMarcado: { backgroundColor: COR_MARCA, borderColor: COR_MARCA },
   checkboxMarcaTexto: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
   editarEquipamentoBotao: { paddingHorizontal: 8, paddingVertical: 4 },
-  editarEquipamentoBotaoTexto: { color: '#007AFF', fontSize: 12, fontWeight: '600' },
+  editarEquipamentoBotaoTexto: { color: COR_MARCA, fontSize: 12, fontWeight: '600' },
   labelPequeno: { fontSize: 13, fontWeight: '600', marginBottom: 6 },
   linhaBotoesEdicao: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   cancelarEdicaoBotao: { paddingVertical: 10, paddingHorizontal: 12 },
@@ -831,13 +832,13 @@ const styles = StyleSheet.create({
   novoEquipamentoForm: { marginTop: 10, borderWidth: 1, borderColor: '#eee', borderRadius: 8, padding: 10 },
   novoEquipamentoBotao: {
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: COR_MARCA,
     borderRadius: 8,
     paddingVertical: 8,
     alignItems: 'center',
     marginTop: 8,
   },
-  novoEquipamentoBotaoTexto: { color: '#007AFF', fontWeight: '600' },
+  novoEquipamentoBotaoTexto: { color: COR_MARCA, fontWeight: '600' },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
@@ -856,7 +857,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 8,
   },
-  tipoButtonSelecionado: { backgroundColor: '#007AFF', borderColor: '#007AFF' },
+  tipoButtonSelecionado: { backgroundColor: COR_MARCA, borderColor: COR_MARCA },
   tipoTexto: { color: '#333' },
   tipoTextoSelecionado: { color: '#fff', fontWeight: 'bold' },
 });

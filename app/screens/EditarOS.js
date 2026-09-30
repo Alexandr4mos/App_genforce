@@ -27,6 +27,7 @@ import {
   gruposOpcionaisIniciais,
   salvarGruposOpcionais,
 } from '../lib/gruposOS';
+import { COR_MARCA } from '../lib/tema';
 
 export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
   const { cores } = useTema();
@@ -709,7 +710,7 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 40, paddingHorizontal: 20, backgroundColor: '#fff' },
   backButton: { marginBottom: 10 },
-  backText: { color: '#007AFF', fontSize: 16 },
+  backText: { color: COR_MARCA, fontSize: 16 },
   title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20 },
   label: { fontSize: 14, fontWeight: 'bold', marginTop: 16, marginBottom: 8 },
   input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, marginBottom: 10 },
@@ -724,7 +725,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 8,
   },
-  tipoButtonSelecionado: { backgroundColor: '#007AFF', borderColor: '#007AFF' },
+  tipoButtonSelecionado: { backgroundColor: COR_MARCA, borderColor: COR_MARCA },
   tipoTexto: { color: '#333' },
   tipoTextoSelecionado: { color: '#fff', fontWeight: 'bold' },
   gruposAjuda: { fontSize: 12, marginBottom: 8, lineHeight: 18 },
@@ -752,20 +753,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxMarcado: { backgroundColor: '#007AFF', borderColor: '#007AFF' },
+  checkboxMarcado: { backgroundColor: COR_MARCA, borderColor: COR_MARCA },
   checkboxMarcaTexto: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
   editarEquipamentoBotao: { paddingVertical: 6, paddingHorizontal: 8 },
-  editarEquipamentoBotaoTexto: { color: '#007AFF', fontSize: 12, fontWeight: '600' },
+  editarEquipamentoBotaoTexto: { color: COR_MARCA, fontSize: 12, fontWeight: '600' },
   novoEquipamentoForm: { marginTop: 10, marginBottom: 6, borderWidth: 1, borderColor: '#eee', borderRadius: 8, padding: 10 },
   novoEquipamentoBotao: {
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: COR_MARCA,
     borderRadius: 8,
     paddingVertical: 8,
     alignItems: 'center',
     marginTop: 8,
   },
-  novoEquipamentoBotaoTexto: { color: '#007AFF', fontWeight: '600' },
+  novoEquipamentoBotaoTexto: { color: COR_MARCA, fontWeight: '600' },
   periodicidadeBox: {
     borderWidth: 1,
     borderRadius: 8,

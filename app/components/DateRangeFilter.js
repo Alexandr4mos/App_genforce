@@ -17,6 +17,7 @@ import {
   rotuloGatilho,
   tituloMesAno,
 } from '../lib/dateRangeService';
+import { COR_MARCA } from '../lib/tema';
 
 function DayCell({ date, year, month, highlightStart, highlightEnd, onPress, corTexto }) {
   const noMes = mesmoMes(date, year, month);
@@ -338,8 +339,8 @@ const styles = StyleSheet.create({
   },
   presetLinhaAtiva: { backgroundColor: '#e8f1ff' },
   presetTexto: { fontSize: 16, color: '#222' },
-  presetTextoAtivo: { color: '#007AFF', fontWeight: '700' },
-  presetCheck: { color: '#007AFF', fontWeight: 'bold' },
+  presetTextoAtivo: { color: COR_MARCA, fontWeight: '700' },
+  presetCheck: { color: COR_MARCA, fontWeight: 'bold' },
   calendarioDica: { fontSize: 13, color: '#666', marginBottom: 12, paddingHorizontal: 4 },
   calHeader: {
     flexDirection: 'row',
@@ -348,7 +349,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   navMes: { paddingHorizontal: 16, paddingVertical: 6 },
-  navMesTexto: { fontSize: 28, color: '#007AFF', fontWeight: '300' },
+  navMesTexto: { fontSize: 28, color: COR_MARCA, fontWeight: '300' },
   calMesAno: { fontSize: 16, fontWeight: '700', textTransform: 'capitalize' },
   semanaRow: { flexDirection: 'row', marginBottom: 4 },
   semanaTexto: {
@@ -374,7 +375,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 1,
   },
-  diaExtremo: { backgroundColor: '#007AFF' },
+  diaExtremo: { backgroundColor: COR_MARCA },
   diaForaDoMes: { opacity: 0.45 },
   diaTexto: { fontSize: 14, color: '#222' },
   diaTextoFora: { color: '#999' },
