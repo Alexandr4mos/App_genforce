@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { avisar } from '../lib/avisos';
+import { avisar, confirmarAcao } from '../lib/avisos';
 import { useTema } from '../lib/tema';
 import {
   TIPOS_OS,
@@ -22,6 +22,7 @@ import {
   pesoPrioridade,
   STATUS_OS_ABERTAS,
 } from '../lib/constantes';
+import { ehPrivilegiado } from '../lib/auth';
 import SeletorCliente from '../components/SeletorCliente';
 import CalendarioPlanejamento from '../components/CalendarioPlanejamento';
 import DateRangeFilter from '../components/DateRangeFilter';
@@ -48,7 +49,7 @@ function formatarDataHora(valor) {
   });
 }
 
-export default function ListaDeOS({ onBack, onAbrirOS, userId }) {
+export default function ListaDeOS({ onBack, onAbrirOS, onEditarOS, onRemanejar, userId }) {
   const { cores } = useTema();
   const [papel, setPapel] = useState(null);
   const [clientes, setClientes] = useState([]);
@@ -62,8 +63,9 @@ export default function ListaDeOS({ onBack, onAbrirOS, userId }) {
   const [pendenciasResolvidas, setPendenciasResolvidas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [painelSuperior, setPainelSuperior] = useState('calendario');
+  const [menuAbertoId, setMenuAbertoId] = useState(null);
 
-  const privilegiado = papel === 'admin' || papel === 'supervisor';
+  const privilegiado = ehPrivilegiado(papel);
 
   useEffect(() => {
     carregarClientes();
@@ -301,20 +303,54 @@ export default function ListaDeOS({ onBack, onAbrirOS, userId }) {
     setTiposSelecionados((prev) => ({ ...prev, [valor]: !prev[valor] }));
   }
 
+  function tentarRemanejar(osId) {
+    if (!privilegiado) {
+      avisar(
+        'Você não tem permissão para esta ação. Apenas administradores podem remanejar OS.',
+        'Sem permissão'
+      );
+      return;
+    }
+    onRemanejar?.(osId);
+  }
+
+  async function excluirOSDaLista(osId) {
+    const confirmado = await confirmarAcao(
+      'Tem certeza que deseja excluir esta OS? Essa ação não pode ser desfeita.'
+    );
+    if (!confirmado) return;
+
+    await supabase.from('pendencias').update({ os_origem_id: null }).eq('os_origem_id', osId);
+    await supabase.from('pendencias').update({ os_baixa_id: null }).eq('os_baixa_id', osId);
+
+    const { error } = await supabase.from('ordens_servico').delete().eq('id', osId);
+
+    if (error) {
+      avisar(error.message || 'Tente novamente.', 'Erro ao excluir');
+      return;
+    }
+
+    setMenuAbertoId(null);
+    setResultados((prev) => prev.filter((os) => os.id !== osId));
+    setFilaRevisao((prev) => prev.filter((os) => os.id !== osId));
+  }
+
   function renderCardOS(os, { mostrarPrioridade = false } = {}) {
     const tipos = (os.os_tipos || []).map((t) => t.tipo);
     const dataRef = os.checkout_em || os.data_inicio_prevista || os.criado_em;
     const efetivo = statusEfetivo(os);
     const nivel = os.prioridade || 'medio';
     const corPrioridade = corDaPrioridade(nivel);
+    const menuAberto = menuAbertoId === os.id;
     return (
-      <TouchableOpacity
+      <View
         key={os.id}
         style={[styles.card, { borderColor: corDoStatus(efetivo), backgroundColor: cores.fundoCard }]}
-        onPress={() => onAbrirOS?.(os.id)}
       >
         <View style={styles.cardHeader}>
-          <Text style={[styles.cardNumero, { color: cores.texto }]}>OS #{os.numero}</Text>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => onAbrirOS?.(os.id)}>
+            <Text style={[styles.cardNumero, { color: cores.texto }]}>OS #{os.numero}</Text>
+          </TouchableOpacity>
           <View style={styles.cardBadges}>
             {mostrarPrioridade ? (
               <View style={[styles.prioridadeBadge, { backgroundColor: corPrioridade }]}>
@@ -331,26 +367,67 @@ export default function ListaDeOS({ onBack, onAbrirOS, userId }) {
             <View style={[styles.statusBadge, { backgroundColor: corDoStatus(efetivo) }]}>
               <Text style={styles.statusBadgeTexto}>{rotuloStatus(efetivo)}</Text>
             </View>
+            <TouchableOpacity
+              style={styles.menuBotao}
+              onPress={() => setMenuAbertoId(menuAberto ? null : os.id)}
+            >
+              <Text style={[styles.menuBotaoTexto, { color: cores.textoSecundario }]}>⋮</Text>
+            </TouchableOpacity>
           </View>
         </View>
-        <Text style={[styles.cardCliente, { color: cores.texto }]}>
-          {os.clientes?.nome}
-          {os.clientes?.razao_social ? ` — ${os.clientes.razao_social}` : ''}
-        </Text>
-        {os.descricao ? (
-          <Text style={[styles.cardDescricao, { color: cores.textoSecundario }]} numberOfLines={2}>
-            {os.descricao}
+
+        <TouchableOpacity onPress={() => onAbrirOS?.(os.id)}>
+          <Text style={[styles.cardCliente, { color: cores.texto }]}>
+            {os.clientes?.nome}
+            {os.clientes?.razao_social ? ` — ${os.clientes.razao_social}` : ''}
           </Text>
+          {os.descricao ? (
+            <Text style={[styles.cardDescricao, { color: cores.textoSecundario }]} numberOfLines={2}>
+              {os.descricao}
+            </Text>
+          ) : null}
+          <View style={styles.tiposRow}>
+            {tipos.map((t) => (
+              <View key={t} style={[styles.tipoChip, { backgroundColor: cores.chipTipoFundo }]}>
+                <Text style={[styles.tipoChipTexto, { color: cores.primarioTexto }]}>{rotuloTipo(t)}</Text>
+              </View>
+            ))}
+          </View>
+          <Text style={[styles.cardData, { color: cores.textoSuave }]}>{formatarDataHora(dataRef)}</Text>
+        </TouchableOpacity>
+
+        {menuAberto ? (
+          <View style={[styles.menuDropdown, { borderColor: cores.borda }]}>
+            <TouchableOpacity
+              style={styles.menuOpcao}
+              onPress={() => {
+                setMenuAbertoId(null);
+                onEditarOS?.(os.id);
+              }}
+            >
+              <Text style={[styles.menuOpcaoTexto, { color: cores.texto }]}>✎ Editar OS</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuOpcao}
+              onPress={() => {
+                setMenuAbertoId(null);
+                tentarRemanejar(os.id);
+              }}
+            >
+              <Text style={[styles.menuOpcaoTexto, { color: cores.texto }]}>📅 Remanejar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuOpcao}
+              onPress={() => {
+                setMenuAbertoId(null);
+                excluirOSDaLista(os.id);
+              }}
+            >
+              <Text style={[styles.menuOpcaoTexto, styles.menuOpcaoExcluirTexto]}>🗑 Excluir OS</Text>
+            </TouchableOpacity>
+          </View>
         ) : null}
-        <View style={styles.tiposRow}>
-          {tipos.map((t) => (
-            <View key={t} style={[styles.tipoChip, { backgroundColor: cores.chipTipoFundo }]}>
-              <Text style={[styles.tipoChipTexto, { color: cores.primarioTexto }]}>{rotuloTipo(t)}</Text>
-            </View>
-          ))}
-        </View>
-        <Text style={[styles.cardData, { color: cores.textoSuave }]}>{formatarDataHora(dataRef)}</Text>
-      </TouchableOpacity>
+      </View>
     );
   }
 
@@ -622,6 +699,17 @@ const styles = StyleSheet.create({
   tipoChip: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
   tipoChipTexto: { fontSize: 10, fontWeight: '600' },
   cardData: { fontSize: 12 },
+  menuBotao: { paddingHorizontal: 8, paddingVertical: 2 },
+  menuBotaoTexto: { fontSize: 20, fontWeight: 'bold' },
+  menuDropdown: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  menuOpcao: { paddingVertical: 10, paddingHorizontal: 12, borderTopWidth: 1, borderTopColor: '#f2f2f2' },
+  menuOpcaoTexto: { fontSize: 14 },
+  menuOpcaoExcluirTexto: { color: '#e53935' },
   filtroAtivoBar: { borderRadius: 8, padding: 10, marginBottom: 12 },
   filtroAtivoTexto: { fontSize: 13, fontWeight: '600' },
   painelRevisao: { paddingBottom: 4 },

@@ -159,6 +159,19 @@ function AppInterno() {
     );
   }
 
+  if (osRemanejandoId) {
+    return (
+      <>
+        <StatusBar style={modoEscuro ? 'light' : 'dark'} />
+        <RemanejarOS
+          osId={osRemanejandoId}
+          onBack={() => setOsRemanejandoId(null)}
+          onSalvo={() => setOsRemanejandoId(null)}
+        />
+      </>
+    );
+  }
+
   if (mostrandoListaDeOS) {
     return (
       <>
@@ -170,6 +183,8 @@ function AppInterno() {
             setMostrandoListaDeOS(false);
             setOsSelecionadaId(id);
           }}
+          onEditarOS={setOsEditandoId}
+          onRemanejar={setOsRemanejandoId}
         />
       </>
     );
@@ -218,19 +233,6 @@ function AppInterno() {
         <GestaoUsuarios
           userId={session.user.id}
           onBack={() => setMostrandoGestaoUsuarios(false)}
-        />
-      </>
-    );
-  }
-
-  if (osRemanejandoId) {
-    return (
-      <>
-        <StatusBar style={modoEscuro ? 'light' : 'dark'} />
-        <RemanejarOS
-          osId={osRemanejandoId}
-          onBack={() => setOsRemanejandoId(null)}
-          onSalvo={() => setOsRemanejandoId(null)}
         />
       </>
     );
