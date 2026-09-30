@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import { supabase } from './supabase';
 import { rotuloStatus, rotuloTipo, statusEfetivo } from './constantes';
 import { avisar } from './avisos';
+import { normalizarNomeResponsavel } from './assinaturas';
 
 function escHtml(texto) {
   return String(texto || '')
@@ -74,7 +75,7 @@ ul{padding-left:20px}img{max-width:280px;border:1px solid #ddd;margin-top:8px}
 ${(assinaturas || [])
   .map(
     (a) =>
-      `<p><strong>${escHtml(a.tipo)}:</strong> ${escHtml(a.nome_responsavel)}<br/>` +
+      `<p><strong>${escHtml(a.tipo)}:</strong> ${escHtml(normalizarNomeResponsavel(a.nome_responsavel))}<br/>` +
       (a.imagem_url ? `<img src="${a.imagem_url}" alt="assinatura"/>` : '') +
       '</p>'
   )

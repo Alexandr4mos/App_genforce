@@ -26,6 +26,7 @@ import SecaoChecklist from '../components/SecaoChecklist';
 import SecaoPecasTrocadas from '../components/SecaoPecasTrocadas';
 import SecaoColapsavel from '../components/SecaoColapsavel';
 import { uriParaBlobJpeg, extensaoDeContentType } from '../lib/fotosUpload';
+import { normalizarNomeResponsavel } from '../lib/assinaturas';
 
 // Chave composta: cada resposta pertence a um gerador (os_equipamento) + item específico.
 // Usar só o id do item causava "vazamento" de resposta entre GMG 01 e GMG 02 quando
@@ -139,6 +140,7 @@ export default function OSDetail({ osId, userId, onBack }) {
   const assinaturaTecnicoRef = useRef(null);
   const osEquipamentosRef = useRef([]);
   const gruposOpcionaisRef = useRef(new Set());
+  const respostaIdsRef = useRef({});
 
   useEffect(() => {
     respostasRef.current = respostas;
@@ -167,6 +169,9 @@ export default function OSDetail({ osId, userId, onBack }) {
   useEffect(() => {
     gruposOpcionaisRef.current = gruposOpcionais;
   }, [gruposOpcionais]);
+  useEffect(() => {
+    respostaIdsRef.current = respostaIds;
+  }, [respostaIds]);
 
   useEffect(() => {
     loadData();
@@ -269,6 +274,7 @@ export default function OSDetail({ osId, userId, onBack }) {
     setRespostas(respostasIniciais);
     respostasRef.current = respostasIniciais;
     setRespostaIds(idsIniciais);
+    respostaIdsRef.current = idsIniciais;
     setFotosPorItem(fotosIniciais);
     setObservacoesItem(observacoesIniciais);
     observacoesRef.current = observacoesIniciais;
@@ -572,6 +578,38 @@ export default function OSDetail({ osId, userId, onBack }) {
     return data.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
   }
 
+  async function salvarRespostasEmLote(pares) {
+    if (!osInfo?.checkin_em || !pares?.length) return [];
+
+    const agora = new Date().toISOString();
+    const rows = pares.map((p) => ({
+      os_equipamento_id: p.osEquipamentoId,
+      template_item_id: p.templateItemId,
+      resposta: p.valor,
+      observacao: p.observacao?.trim() ? p.observacao.trim() : null,
+      respondido_em: agora,
+      respondido_por: userId || null,
+    }));
+
+    const { data, error } = await supabase
+      .from('checklist_respostas')
+      .upsert(rows, { onConflict: 'os_equipamento_id,template_item_id' })
+      .select('id, os_equipamento_id, template_item_id');
+
+    if (error) throw error;
+
+    setRespostaIds((prev) => {
+      const next = { ...prev };
+      (data || []).forEach((r) => {
+        next[chave(r.os_equipamento_id, r.template_item_id)] = r.id;
+      });
+      respostaIdsRef.current = next;
+      return next;
+    });
+
+    return data || [];
+  }
+
   async function garantirRespostaSalva(osEquipamentoId, templateItemId, overrides = {}) {
     if (!osInfo?.checkin_em) return null;
     const k = chave(osEquipamentoId, templateItemId);
@@ -583,40 +621,26 @@ export default function OSDetail({ osId, userId, onBack }) {
         ? overrides.observacao
         : observacoesRef.current[k] || null;
 
-    const { data: existente, error: errExistente } = await supabase
-      .from('checklist_respostas')
-      .select('id')
-      .eq('os_equipamento_id', osEquipamentoId)
-      .eq('template_item_id', templateItemId)
-      .maybeSingle();
-
-    if (errExistente) throw errExistente;
-
-    let respostaId = existente?.id;
-
-    if (existente) {
+    // Preferência: PATCH direto quando já conhecemos o id (1 request, sem GET).
+    const idConhecido = respostaIdsRef.current[k];
+    if (idConhecido) {
       const { error } = await supabase
         .from('checklist_respostas')
-        .update({ resposta: valor, observacao, respondido_em: new Date().toISOString() })
-        .eq('id', existente.id);
-      if (error) throw error;
-    } else {
-      const { data: inserida, error } = await supabase
-        .from('checklist_respostas')
-        .insert({
-          os_equipamento_id: osEquipamentoId,
-          template_item_id: templateItemId,
+        .update({
           resposta: valor,
-          observacao,
+          observacao: observacao?.trim() ? observacao.trim() : null,
+          respondido_em: new Date().toISOString(),
+          respondido_por: userId || null,
         })
-        .select('id')
-        .single();
+        .eq('id', idConhecido);
       if (error) throw error;
-      respostaId = inserida?.id;
+      return idConhecido;
     }
 
-    setRespostaIds((prev) => ({ ...prev, [k]: respostaId }));
-    return respostaId;
+    const [salva] = await salvarRespostasEmLote([
+      { osEquipamentoId, templateItemId, valor, observacao },
+    ]);
+    return salva?.id || null;
   }
 
   async function executarSalvamento(fn, chaveRetry = null) {
@@ -1120,9 +1144,10 @@ export default function OSDetail({ osId, userId, onBack }) {
       }
 
       let salva;
+      const nomeLimpo = normalizarNomeResponsavel(nome_responsavel);
       if (existente?.id) {
         const updatePayload = {
-          nome_responsavel,
+          nome_responsavel: nomeLimpo,
           imagem_url: urlData.publicUrl,
         };
         if (tipo === 'tecnico') updatePayload.usuario_id = userId;
@@ -1138,7 +1163,7 @@ export default function OSDetail({ osId, userId, onBack }) {
         const payload = {
           os_id: osId,
           tipo,
-          nome_responsavel,
+          nome_responsavel: nomeLimpo,
           imagem_url: urlData.publicUrl,
         };
         if (tipo === 'tecnico') payload.usuario_id = userId;
@@ -1206,12 +1231,21 @@ export default function OSDetail({ osId, userId, onBack }) {
     if (!osInfo?.checkin_em) return;
     setSalvandoSecao(chaveSecao);
     try {
-      for (const item of itensDaSecao) {
-        const k = chave(eq.id, item.id);
-        if (respostasRef.current[k]) {
-          await garantirRespostaSalva(eq.id, item.id);
-        }
-      }
+      const pares = itensDaSecao
+        .map((item) => {
+          const k = chave(eq.id, item.id);
+          const valor = respostasRef.current[k];
+          if (valor == null || String(valor).trim() === '') return null;
+          return {
+            osEquipamentoId: eq.id,
+            templateItemId: item.id,
+            valor,
+            observacao: observacoesRef.current[k] || null,
+          };
+        })
+        .filter(Boolean);
+
+      await salvarRespostasEmLote(pares);
       setStatusSalvamento('salvo');
       recomputarRelatorioSalvo();
       avisar('Seção salva.', 'Sucesso');
@@ -1233,13 +1267,28 @@ export default function OSDetail({ osId, userId, onBack }) {
     setStatusSalvamento('salvando');
 
     try {
-      for (const eq of osEquipamentos) {
-        for (const item of eq.itens) {
-          if (respostasRef.current[chave(eq.id, item.id)]) {
-            await garantirRespostaSalva(eq.id, item.id);
-          }
-        }
-      }
+      // Cancela debounces pendentes — o lote abaixo já persiste o estado atual.
+      Object.keys(debounceTimers.current).forEach((k) => {
+        clearTimeout(debounceTimers.current[k]);
+        delete debounceTimers.current[k];
+      });
+
+      const pares = [];
+      osEquipamentos.forEach((eq) => {
+        eq.itens.forEach((item) => {
+          const k = chave(eq.id, item.id);
+          const valor = respostasRef.current[k];
+          if (valor == null || String(valor).trim() === '') return;
+          pares.push({
+            osEquipamentoId: eq.id,
+            templateItemId: item.id,
+            valor,
+            observacao: observacoesRef.current[k] || null,
+          });
+        });
+      });
+
+      await salvarRespostasEmLote(pares);
 
       await salvarCamposOs({
         observacoes_gerais: observacaoGeralRef.current,

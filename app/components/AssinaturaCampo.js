@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useTema } from '../lib/tema';
 import { avisar } from '../lib/avisos';
+import { normalizarNomeResponsavel } from '../lib/assinaturas';
 
 const LARGURA = 320;
 const ALTURA = 140;
@@ -51,8 +52,9 @@ function redesenharCanvas(canvas, paths) {
 
 export default function AssinaturaCampo({ titulo, assinatura, onSalvar, onExcluir, desabilitado }) {
   const { cores } = useTema();
+  const nomeInicial = normalizarNomeResponsavel(assinatura?.nome_responsavel || '');
   const [editando, setEditando] = useState(!assinatura);
-  const [nome, setNome] = useState(assinatura?.nome_responsavel || '');
+  const [nome, setNome] = useState(nomeInicial);
   const [paths, setPaths] = useState([]);
   const [salvando, setSalvando] = useState(false);
   const canvasRef = useRef(null);
@@ -61,11 +63,11 @@ export default function AssinaturaCampo({ titulo, assinatura, onSalvar, onExclui
 
   useEffect(() => {
     setEditando(!assinatura);
-    setNome(assinatura?.nome_responsavel || '');
+    setNome(normalizarNomeResponsavel(assinatura?.nome_responsavel || ''));
     setPaths([]);
     pathsRef.current = [];
     limparCanvas();
-  }, [assinatura?.id, assinatura?.imagem_url]);
+  }, [assinatura?.id, assinatura?.imagem_url, assinatura?.nome_responsavel]);
 
   function limparCanvas() {
     if (Platform.OS === 'web' && canvasRef.current) {
@@ -209,7 +211,7 @@ export default function AssinaturaCampo({ titulo, assinatura, onSalvar, onExclui
     setSalvando(true);
     try {
       await onSalvar({
-        nome_responsavel: nome.trim(),
+        nome_responsavel: normalizarNomeResponsavel(nome),
         blob: gerado.blob,
         contentType: gerado.contentType,
         extensao: gerado.extensao,
@@ -222,7 +224,7 @@ export default function AssinaturaCampo({ titulo, assinatura, onSalvar, onExclui
 
   function handleEditar() {
     setEditando(true);
-    setNome(assinatura?.nome_responsavel || '');
+    setNome(normalizarNomeResponsavel(assinatura?.nome_responsavel || ''));
     setPaths([]);
     pathsRef.current = [];
     setTimeout(limparCanvas, 0);
@@ -255,7 +257,7 @@ export default function AssinaturaCampo({ titulo, assinatura, onSalvar, onExclui
         <View style={styles.miniaturaRow}>
           <Image source={{ uri: assinatura.imagem_url }} style={styles.miniatura} resizeMode="contain" />
           <Text style={[styles.nomeAssinado, { color: cores.texto }]}>
-            {assinatura.nome_responsavel || '—'}
+            {normalizarNomeResponsavel(assinatura.nome_responsavel) || '—'}
           </Text>
           {!desabilitado ? (
             <View style={styles.acoesRow}>

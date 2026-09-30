@@ -186,6 +186,9 @@ create table checklist_respostas (
   respondido_em timestamptz default now()
 );
 
+create unique index if not exists checklist_respostas_os_eq_item_uidx
+  on checklist_respostas (os_equipamento_id, template_item_id);
+
 -- ---------------------------------------------------------
 -- 8. PENDÊNCIAS (antes de fotos por FK pendencia_id)
 -- ---------------------------------------------------------
