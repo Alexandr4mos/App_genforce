@@ -11,7 +11,7 @@ import {
   Switch,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { TIPOS_OS, STATUS_OS, PRIORIDADES_OS, TEMPLATE_PADRAO_ID } from '../lib/constantes';
+import { TIPOS_OS, STATUS_OS, PRIORIDADES_OS, TEMPLATE_PADRAO_ID, PERIODICIDADES_MANUTENCAO } from '../lib/constantes';
 import { useTema } from '../lib/tema';
 import { avisar, confirmarAcao } from '../lib/avisos';
 import DatePickerCampo from '../components/DatePickerCampo';
@@ -45,6 +45,7 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
   const [edPotencia, setEdPotencia] = useState('');
   const [edPlacaMotor, setEdPlacaMotor] = useState('');
   const [edPlacaAlternador, setEdPlacaAlternador] = useState('');
+  const [edPeriodicidade, setEdPeriodicidade] = useState('');
   const [salvandoEdicaoEquipamento, setSalvandoEdicaoEquipamento] = useState(false);
 
   // Cadastrar gerador novo direto daqui (mesma UX da NovaOS)
@@ -150,7 +151,7 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
     if (os.unidade_id) {
       const { data: equipamentosDaUnidade } = await supabase
         .from('equipamentos')
-        .select('id, tag, fabricante_gmg, potencia_kva, placa_motor, placa_alternador')
+        .select('id, tag, fabricante_gmg, potencia_kva, placa_motor, placa_alternador, periodicidade_manutencao')
         .eq('unidade_id', os.unidade_id)
         .order('tag');
       setEquipamentos(equipamentosDaUnidade || []);
@@ -177,7 +178,7 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
         placa_motor: novoPlacaMotor.trim() || null,
         placa_alternador: novoPlacaAlternador.trim() || null,
       })
-      .select('id, tag, fabricante_gmg, potencia_kva, placa_motor, placa_alternador')
+      .select('id, tag, fabricante_gmg, potencia_kva, placa_motor, placa_alternador, periodicidade_manutencao')
       .single();
 
     setSalvandoEquipamento(false);
@@ -205,6 +206,7 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
     setEdPotencia(e.potencia_kva ? String(e.potencia_kva) : '');
     setEdPlacaMotor(e.placa_motor || '');
     setEdPlacaAlternador(e.placa_alternador || '');
+    setEdPeriodicidade(e.periodicidade_manutencao || '');
   }
 
   async function salvarEdicaoEquipamento() {
@@ -221,6 +223,7 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
       potencia_kva: edPotencia ? Number(edPotencia) : null,
       placa_motor: edPlacaMotor.trim() || null,
       placa_alternador: edPlacaAlternador.trim() || null,
+      periodicidade_manutencao: edPeriodicidade?.trim() || null,
     };
 
     const { error } = await supabase
@@ -533,6 +536,29 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
                   value={edPlacaAlternador}
                   onChangeText={setEdPlacaAlternador}
                 />
+                <Text style={[styles.label, { color: cores.texto, marginTop: 4 }]}>Periodicidade de manutenção</Text>
+                <View style={styles.tipoRow}>
+                  {PERIODICIDADES_MANUTENCAO.map((p) => {
+                    const selecionado = edPeriodicidade === p.valor;
+                    return (
+                      <TouchableOpacity
+                        key={p.valor}
+                        style={[styles.tipoButton, selecionado && styles.tipoButtonSelecionado]}
+                        onPress={() => setEdPeriodicidade(selecionado ? '' : p.valor)}
+                      >
+                        <Text
+                          style={
+                            selecionado
+                              ? styles.tipoTextoSelecionado
+                              : [styles.tipoTexto, { color: cores.texto }]
+                          }
+                        >
+                          {p.rotulo}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
                 <View style={styles.linhaBotoesEdicao}>
                   <TouchableOpacity
                     style={styles.cancelarEdicaoBotao}

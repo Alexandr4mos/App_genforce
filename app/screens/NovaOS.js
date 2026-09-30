@@ -9,7 +9,7 @@ import {
   Button,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { TIPOS_OS, PRIORIDADES_OS, TEMPLATE_PADRAO_ID, statusEfetivo } from '../lib/constantes';
+import { TIPOS_OS, PRIORIDADES_OS, TEMPLATE_PADRAO_ID, statusEfetivo, PERIODICIDADES_MANUTENCAO, rotuloPeriodicidade } from '../lib/constantes';
 import { useTema } from '../lib/tema';
 import { avisar } from '../lib/avisos';
 import SeletorCliente from '../components/SeletorCliente';
@@ -78,11 +78,29 @@ export default function NovaOS({ onBack, onCriada }) {
   const [salvandoUnidade, setSalvandoUnidade] = useState(false);
 
   const [unidadeSelecionadaInfo, setUnidadeSelecionadaInfo] = useState(null);
+  const [equipamentoEditandoId, setEquipamentoEditandoId] = useState(null);
+  const [edTag, setEdTag] = useState('');
+  const [edPeriodicidade, setEdPeriodicidade] = useState('');
+  const [salvandoEdicaoEquipamento, setSalvandoEdicaoEquipamento] = useState(false);
   const unidadesRequestRef = useRef(0);
   const clienteNomeSelecionado = clientes.find((c) => c.id === clienteId)?.nome || '';
 
+  const geradoresMarcados = equipamentos.filter((e) => equipamentosSelecionados[e.id]);
+
   function alternarTipo(valor) {
     setTiposSelecionados((prev) => ({ ...prev, [valor]: !prev[valor] }));
+  }
+
+  function selecionarCliente(c) {
+    setClienteId(c.id);
+    setUnidades([]);
+    setUnidadeId(null);
+    setUnidadeSelecionadaInfo(null);
+    setEquipamentos([]);
+    setEquipamentosSelecionados({});
+    setEquipamentoEditandoId(null);
+    setMostrarNovaUnidade(false);
+    setMostrarNovoEquipamento(false);
   }
 
   useEffect(() => {
@@ -111,7 +129,7 @@ export default function NovaOS({ onBack, onCriada }) {
     setClientes(data || []);
   }
 
-  async function carregarUnidades(idCliente, { manterSelecao } = {}) {
+  async function carregarUnidades(idCliente) {
     const requestId = ++unidadesRequestRef.current;
     const { data } = await supabase
       .from('unidades')
@@ -119,11 +137,16 @@ export default function NovaOS({ onBack, onCriada }) {
       .eq('cliente_id', idCliente)
       .order('nome');
 
-    // Ignora resposta antiga (race com outro fetch ou com insert de unidade).
+    // Ignora resposta antiga (race ao trocar de cliente).
     if (requestId !== unidadesRequestRef.current) return;
 
-    setUnidades(data || []);
-    if (!manterSelecao) {
+    const lista = data || [];
+    setUnidades(lista);
+
+    if (lista.length === 1) {
+      setUnidadeId(lista[0].id);
+      setUnidadeSelecionadaInfo(lista[0]);
+    } else {
       setUnidadeId(null);
       setUnidadeSelecionadaInfo(null);
     }
@@ -132,15 +155,50 @@ export default function NovaOS({ onBack, onCriada }) {
   async function carregarEquipamentos(idUnidade) {
     const { data } = await supabase
       .from('equipamentos')
-      .select('id, tag, fabricante_gmg')
+      .select('id, tag, fabricante_gmg, periodicidade_manutencao')
       .eq('unidade_id', idUnidade)
       .order('tag');
     setEquipamentos(data || []);
     setEquipamentosSelecionados({});
+    setEquipamentoEditandoId(null);
   }
 
   function alternarSelecao(idEquipamento) {
     setEquipamentosSelecionados((prev) => ({ ...prev, [idEquipamento]: !prev[idEquipamento] }));
+  }
+
+  function abrirEdicaoEquipamento(e) {
+    setEquipamentoEditandoId(e.id);
+    setEdTag(e.tag || '');
+    setEdPeriodicidade(e.periodicidade_manutencao || '');
+  }
+
+  async function salvarEdicaoEquipamento() {
+    if (!edTag.trim()) {
+      avisar('Informe a identificação do gerador (ex: GMG 03).', 'Preencha o campo obrigatório');
+      return;
+    }
+
+    setSalvandoEdicaoEquipamento(true);
+    const dadosAtualizados = {
+      tag: edTag.trim(),
+      periodicidade_manutencao: edPeriodicidade?.trim() || null,
+    };
+    const { error } = await supabase
+      .from('equipamentos')
+      .update(dadosAtualizados)
+      .eq('id', equipamentoEditandoId);
+    setSalvandoEdicaoEquipamento(false);
+
+    if (error) {
+      avisar(error.message || 'Tente novamente.', 'Erro ao salvar gerador');
+      return;
+    }
+
+    setEquipamentos((prev) =>
+      prev.map((e) => (e.id === equipamentoEditandoId ? { ...e, ...dadosAtualizados } : e))
+    );
+    setEquipamentoEditandoId(null);
   }
 
   function abrirFormNovaUnidade() {
@@ -276,7 +334,7 @@ export default function NovaOS({ onBack, onCriada }) {
         data_inicio_contrato: novoEquipamento.data_inicio_contrato?.trim() || null,
         periodicidade_manutencao: novoEquipamento.periodicidade_manutencao?.trim() || null,
       })
-      .select('id, tag, fabricante_gmg')
+      .select('id, tag, fabricante_gmg, periodicidade_manutencao')
       .single();
 
     if (error) {
@@ -447,7 +505,7 @@ export default function NovaOS({ onBack, onCriada }) {
       <SeletorCliente
         clientes={clientes}
         clienteId={clienteId}
-        onSelecionar={(c) => setClienteId(c.id)}
+        onSelecionar={selecionarCliente}
       />
 
       {mostrarNovoCliente ? (
@@ -467,29 +525,44 @@ export default function NovaOS({ onBack, onCriada }) {
 
       {clienteId ? (
         <>
-          <Text style={[styles.label, { color: cores.texto }]}>Unidade</Text>
-          <View style={[styles.listaBox, { borderColor: cores.borda }]}>
-            {unidades.map((u) => (
-              <TouchableOpacity
-                key={u.id}
-                style={[styles.itemLista, unidadeId === u.id && styles.itemListaSelecionado]}
-                onPress={() => {
-                  setUnidadeId(u.id);
-                  setUnidadeSelecionadaInfo(u);
-                }}
-              >
-                <Text style={unidadeId === u.id ? styles.itemListaTextoSelecionado : [styles.itemListaTexto, { color: cores.texto }]}>
-                  {u.nome}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            {unidades.length === 0 ? (
-              <Text style={[styles.avisoVazio, { color: cores.textoSuave }]}>Nenhuma unidade cadastrada para este cliente.</Text>
-            ) : null}
-          </View>
+          {unidades.length > 1 ? (
+            <>
+              <Text style={[styles.label, { color: cores.texto }]}>Local / unidade</Text>
+              <View style={[styles.listaBox, { borderColor: cores.borda }]}>
+                {unidades.map((u) => (
+                  <TouchableOpacity
+                    key={u.id}
+                    style={[styles.itemLista, unidadeId === u.id && styles.itemListaSelecionado]}
+                    onPress={() => {
+                      setUnidadeId(u.id);
+                      setUnidadeSelecionadaInfo(u);
+                    }}
+                  >
+                    <Text
+                      style={
+                        unidadeId === u.id
+                          ? styles.itemListaTextoSelecionado
+                          : [styles.itemListaTexto, { color: cores.texto }]
+                      }
+                    >
+                      {u.nome}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          ) : null}
 
           {unidadeSelecionadaInfo?.endereco ? (
-            <Text style={[styles.enderecoTexto, { color: cores.textoSecundario }]}>📍 {unidadeSelecionadaInfo.endereco}</Text>
+            <Text style={[styles.enderecoTexto, { color: cores.textoSecundario }]}>
+              📍 {unidadeSelecionadaInfo.endereco}
+            </Text>
+          ) : null}
+
+          {unidades.length === 0 ? (
+            <Text style={[styles.avisoVazio, { color: cores.textoSuave }]}>
+              Nenhuma unidade cadastrada para este cliente. Cadastre uma para listar os geradores.
+            </Text>
           ) : null}
 
           {mostrarNovaUnidade ? (
@@ -525,28 +598,104 @@ export default function NovaOS({ onBack, onCriada }) {
           <Text style={[styles.label, { color: cores.texto }]}>Geradores (marque um ou mais)</Text>
           <View style={[styles.listaBox, { borderColor: cores.borda }]}>
             {equipamentos.map((e) => (
-              <TouchableOpacity
-                key={e.id}
-                style={styles.checkboxLinha}
-                onPress={() => alternarSelecao(e.id)}
-              >
-                <View
-                  style={[
-                    styles.checkbox,
-                    equipamentosSelecionados[e.id] && styles.checkboxMarcado,
-                  ]}
-                >
-                  {equipamentosSelecionados[e.id] ? <Text style={styles.checkboxMarcaTexto}>✓</Text> : null}
+              <View key={e.id}>
+                <View style={styles.checkboxLinha}>
+                  <TouchableOpacity style={styles.checkboxLinhaConteudo} onPress={() => alternarSelecao(e.id)}>
+                    <View
+                      style={[
+                        styles.checkbox,
+                        equipamentosSelecionados[e.id] && styles.checkboxMarcado,
+                      ]}
+                    >
+                      {equipamentosSelecionados[e.id] ? (
+                        <Text style={styles.checkboxMarcaTexto}>✓</Text>
+                      ) : null}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.itemListaTexto, { color: cores.texto }]}>
+                        {e.tag} {e.fabricante_gmg ? `— ${e.fabricante_gmg}` : ''}
+                      </Text>
+                      {e.periodicidade_manutencao ? (
+                        <Text style={{ color: cores.textoSecundario, fontSize: 12, marginTop: 2 }}>
+                          Periodicidade: {rotuloPeriodicidade(e.periodicidade_manutencao)}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => abrirEdicaoEquipamento(e)} style={styles.editarEquipamentoBotao}>
+                    <Text style={styles.editarEquipamentoBotaoTexto}>✎ editar</Text>
+                  </TouchableOpacity>
                 </View>
-                <Text style={[styles.itemListaTexto, { color: cores.texto }]}>
-                  {e.tag} {e.fabricante_gmg ? `— ${e.fabricante_gmg}` : ''}
-                </Text>
-              </TouchableOpacity>
+
+                {equipamentoEditandoId === e.id ? (
+                  <View style={styles.novoEquipamentoForm}>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard },
+                      ]}
+                      placeholder="Identificação (ex: GMG 03) *"
+                      value={edTag}
+                      onChangeText={setEdTag}
+                    />
+                    <Text style={[styles.labelPequeno, { color: cores.texto }]}>Periodicidade de manutenção</Text>
+                    <View style={styles.tipoRow}>
+                      {PERIODICIDADES_MANUTENCAO.map((p) => {
+                        const selecionado = edPeriodicidade === p.valor;
+                        return (
+                          <TouchableOpacity
+                            key={p.valor}
+                            style={[styles.tipoButton, selecionado && styles.tipoButtonSelecionado]}
+                            onPress={() => setEdPeriodicidade(selecionado ? '' : p.valor)}
+                          >
+                            <Text style={selecionado ? styles.tipoTextoSelecionado : styles.tipoTexto}>
+                              {p.rotulo}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                    <View style={styles.linhaBotoesEdicao}>
+                      <TouchableOpacity
+                        style={styles.cancelarEdicaoBotao}
+                        onPress={() => setEquipamentoEditandoId(null)}
+                      >
+                        <Text style={styles.cancelarEdicaoBotaoTexto}>Cancelar</Text>
+                      </TouchableOpacity>
+                      <View style={{ flex: 1 }}>
+                        <Button
+                          title={salvandoEdicaoEquipamento ? 'Salvando...' : 'Salvar gerador'}
+                          onPress={salvarEdicaoEquipamento}
+                          disabled={salvandoEdicaoEquipamento}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                ) : null}
+              </View>
             ))}
             {equipamentos.length === 0 ? (
-              <Text style={[styles.avisoVazio, { color: cores.textoSuave }]}>Nenhum gerador cadastrado nesta unidade ainda.</Text>
+              <Text style={[styles.avisoVazio, { color: cores.textoSuave }]}>
+                Nenhum gerador cadastrado nesta unidade ainda.
+              </Text>
             ) : null}
           </View>
+
+          {geradoresMarcados.length > 0 ? (
+            <View style={[styles.periodicidadeBox, { borderColor: cores.borda, backgroundColor: cores.fundoCard }]}>
+              <Text style={[styles.label, { color: cores.texto, marginTop: 0 }]}>
+                Periodicidade de manutenção
+              </Text>
+              {geradoresMarcados.map((e) => (
+                <Text key={e.id} style={{ color: cores.textoSecundario, fontSize: 13, marginBottom: 4 }}>
+                  {geradoresMarcados.length > 1 ? `${e.tag}: ` : ''}
+                  {e.periodicidade_manutencao
+                    ? `Periodicidade contratada: ${rotuloPeriodicidade(e.periodicidade_manutencao)}`
+                    : 'Periodicidade não cadastrada — toque em ✎ editar no gerador'}
+                </Text>
+              ))}
+            </View>
+          ) : null}
 
           {mostrarNovoEquipamento ? (
             <View style={styles.novoEquipamentoForm}>
@@ -646,6 +795,7 @@ const styles = StyleSheet.create({
   avisoVazio: { color: '#999', fontStyle: 'italic', padding: 10, fontSize: 13 },
   enderecoTexto: { fontSize: 13, color: '#666', marginTop: 6, marginBottom: 4 },
   checkboxLinha: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 10 },
+  checkboxLinhaConteudo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   checkbox: {
     width: 20,
     height: 20,
@@ -658,6 +808,19 @@ const styles = StyleSheet.create({
   },
   checkboxMarcado: { backgroundColor: '#007AFF', borderColor: '#007AFF' },
   checkboxMarcaTexto: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
+  editarEquipamentoBotao: { paddingHorizontal: 8, paddingVertical: 4 },
+  editarEquipamentoBotaoTexto: { color: '#007AFF', fontSize: 12, fontWeight: '600' },
+  labelPequeno: { fontSize: 13, fontWeight: '600', marginBottom: 6 },
+  linhaBotoesEdicao: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  cancelarEdicaoBotao: { paddingVertical: 10, paddingHorizontal: 12 },
+  cancelarEdicaoBotaoTexto: { color: '#666', fontWeight: '600' },
+  periodicidadeBox: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 10,
+    marginBottom: 4,
+  },
   novoEquipamentoForm: { marginTop: 10, borderWidth: 1, borderColor: '#eee', borderRadius: 8, padding: 10 },
   novoEquipamentoBotao: {
     borderWidth: 1,
