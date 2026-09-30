@@ -11,7 +11,14 @@ import {
   Switch,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { TIPOS_OS, STATUS_OS, PRIORIDADES_OS, TEMPLATE_PADRAO_ID, PERIODICIDADES_MANUTENCAO } from '../lib/constantes';
+import {
+  TIPOS_OS,
+  STATUS_OS,
+  PRIORIDADES_OS,
+  TEMPLATE_PADRAO_ID,
+  PERIODICIDADES_MANUTENCAO,
+  rotuloPeriodicidade,
+} from '../lib/constantes';
 import { useTema } from '../lib/tema';
 import { avisar, confirmarAcao } from '../lib/avisos';
 import DatePickerCampo from '../components/DatePickerCampo';
@@ -55,7 +62,10 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
   const [novoPotencia, setNovoPotencia] = useState('');
   const [novoPlacaMotor, setNovoPlacaMotor] = useState('');
   const [novoPlacaAlternador, setNovoPlacaAlternador] = useState('');
+  const [novoPeriodicidade, setNovoPeriodicidade] = useState('');
   const [salvandoEquipamento, setSalvandoEquipamento] = useState(false);
+
+  const geradoresMarcados = equipamentos.filter((e) => equipamentosSelecionados[e.id]);
 
   const [nomesGrupos, setNomesGrupos] = useState([]);
   const [gruposOpcionais, setGruposOpcionais] = useState(new Set());
@@ -177,6 +187,7 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
         potencia_kva: novoPotencia ? Number(novoPotencia) : null,
         placa_motor: novoPlacaMotor.trim() || null,
         placa_alternador: novoPlacaAlternador.trim() || null,
+        periodicidade_manutencao: novoPeriodicidade?.trim() || null,
       })
       .select('id, tag, fabricante_gmg, potencia_kva, placa_motor, placa_alternador, periodicidade_manutencao')
       .single();
@@ -196,6 +207,7 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
     setNovoPotencia('');
     setNovoPlacaMotor('');
     setNovoPlacaAlternador('');
+    setNovoPeriodicidade('');
     setMostrarNovoEquipamento(false);
   }
 
@@ -494,9 +506,16 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
                 >
                   {equipamentosSelecionados[e.id] ? <Text style={styles.checkboxMarcaTexto}>✓</Text> : null}
                 </View>
-                <Text style={[styles.itemListaTexto, { color: cores.texto }]}>
-                  {e.tag} {e.fabricante_gmg ? `— ${e.fabricante_gmg}` : ''}
-                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.itemListaTexto, { color: cores.texto }]}>
+                    {e.tag} {e.fabricante_gmg ? `— ${e.fabricante_gmg}` : ''}
+                  </Text>
+                  {e.periodicidade_manutencao ? (
+                    <Text style={{ color: cores.textoSecundario, fontSize: 12, marginTop: 2 }}>
+                      Periodicidade: {rotuloPeriodicidade(e.periodicidade_manutencao)}
+                    </Text>
+                  ) : null}
+                </View>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => abrirEdicaoEquipamento(e)} style={styles.editarEquipamentoBotao}>
                 <Text style={styles.editarEquipamentoBotaoTexto}>✎ editar</Text>
@@ -583,6 +602,22 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
         ) : null}
       </View>
 
+      {geradoresMarcados.length > 0 ? (
+        <View style={[styles.periodicidadeBox, { borderColor: cores.borda, backgroundColor: cores.fundoCard }]}>
+          <Text style={[styles.label, { color: cores.texto, marginTop: 0 }]}>
+            Periodicidade de manutenção
+          </Text>
+          {geradoresMarcados.map((e) => (
+            <Text key={e.id} style={{ color: cores.textoSecundario, fontSize: 13, marginBottom: 4 }}>
+              {geradoresMarcados.length > 1 ? `${e.tag}: ` : ''}
+              {e.periodicidade_manutencao
+                ? `Periodicidade contratada: ${rotuloPeriodicidade(e.periodicidade_manutencao)}`
+                : 'Periodicidade não cadastrada — toque em ✎ editar no gerador'}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+
       {mostrarNovoEquipamento ? (
         <View style={styles.novoEquipamentoForm}>
           <TextInput
@@ -616,6 +651,29 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
             value={novoPlacaAlternador}
             onChangeText={setNovoPlacaAlternador}
           />
+          <Text style={[styles.label, { color: cores.texto, marginTop: 4 }]}>Periodicidade de manutenção</Text>
+          <View style={styles.tipoRow}>
+            {PERIODICIDADES_MANUTENCAO.map((p) => {
+              const selecionado = novoPeriodicidade === p.valor;
+              return (
+                <TouchableOpacity
+                  key={p.valor}
+                  style={[styles.tipoButton, selecionado && styles.tipoButtonSelecionado]}
+                  onPress={() => setNovoPeriodicidade(selecionado ? '' : p.valor)}
+                >
+                  <Text
+                    style={
+                      selecionado
+                        ? styles.tipoTextoSelecionado
+                        : [styles.tipoTexto, { color: cores.texto }]
+                    }
+                  >
+                    {p.rotulo}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
           <Button
             title={salvandoEquipamento ? 'Salvando...' : 'Salvar gerador'}
             onPress={cadastrarNovoEquipamento}
@@ -708,6 +766,13 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   novoEquipamentoBotaoTexto: { color: '#007AFF', fontWeight: '600' },
+  periodicidadeBox: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 10,
+    marginBottom: 4,
+  },
   linhaBotoesEdicao: { flexDirection: 'row', alignItems: 'center' },
   cancelarEdicaoBotao: { paddingVertical: 10, paddingHorizontal: 14, marginRight: 8 },
   cancelarEdicaoBotaoTexto: { color: '#666' },

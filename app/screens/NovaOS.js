@@ -92,6 +92,8 @@ export default function NovaOS({ onBack, onCriada }) {
   }
 
   function selecionarCliente(c) {
+    // Invalida fetch de unidades do cliente anterior (evita mostrar unidade/cliente errado).
+    unidadesRequestRef.current += 1;
     setClienteId(c.id);
     setUnidades([]);
     setUnidadeId(null);
@@ -400,7 +402,12 @@ export default function NovaOS({ onBack, onCriada }) {
       return;
     }
     if (!unidadeId) {
-      avisar('Escolha a unidade.', 'Falta informação');
+      avisar(
+        unidades.length > 1
+          ? 'Selecione o local / unidade deste cliente.'
+          : 'Cadastre uma unidade para este cliente antes de criar a OS.',
+        'Falta informação'
+      );
       return;
     }
     const idsSelecionados = Object.keys(equipamentosSelecionados).filter(
