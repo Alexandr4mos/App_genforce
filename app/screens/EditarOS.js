@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -16,17 +16,27 @@ import {
   STATUS_OS,
   PRIORIDADES_OS,
   TEMPLATE_PADRAO_ID,
-  PERIODICIDADES_MANUTENCAO,
   rotuloPeriodicidade,
 } from '../lib/constantes';
 import { useTema } from '../lib/tema';
 import { avisar, confirmarAcao } from '../lib/avisos';
 import DatePickerCampo from '../components/DatePickerCampo';
+import FormularioEquipamento from '../components/FormularioEquipamento';
 import {
   aplicarMudancaTipos,
   gruposOpcionaisIniciais,
   salvarGruposOpcionais,
 } from '../lib/gruposOS';
+import {
+  EQUIPAMENTO_FORM_VAZIO,
+  EQUIPAMENTO_LISTA_SELECT,
+  EQUIPAMENTO_COMPLETO_SELECT,
+  valoresFromEquipamento,
+  payloadFromValores,
+  validarFiltrosForm,
+  filtrosFromRows,
+  substituirFiltrosEquipamento,
+} from '../lib/equipamentoForm';
 
 export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
   const { cores } = useTema();
@@ -45,24 +55,18 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
   const [equipamentosSelecionados, setEquipamentosSelecionados] = useState({});
   const [equipamentosOriginais, setEquipamentosOriginais] = useState(new Set());
 
-  // Editar dados cadastrais de um gerador já existente (item 1b)
+  // Editar dados cadastrais de um gerador já existente
   const [equipamentoEditandoId, setEquipamentoEditandoId] = useState(null);
-  const [edTag, setEdTag] = useState('');
-  const [edFabricante, setEdFabricante] = useState('');
-  const [edPotencia, setEdPotencia] = useState('');
-  const [edPlacaMotor, setEdPlacaMotor] = useState('');
-  const [edPlacaAlternador, setEdPlacaAlternador] = useState('');
-  const [edPeriodicidade, setEdPeriodicidade] = useState('');
+  const [edicaoEquipamento, setEdicaoEquipamento] = useState({ ...EQUIPAMENTO_FORM_VAZIO });
+  const [edicaoFiltros, setEdicaoFiltros] = useState([]);
+  const [carregandoEdicaoEquipamento, setCarregandoEdicaoEquipamento] = useState(false);
   const [salvandoEdicaoEquipamento, setSalvandoEdicaoEquipamento] = useState(false);
+  const edicaoRequestRef = useRef(0);
 
   // Cadastrar gerador novo direto daqui (mesma UX da NovaOS)
   const [mostrarNovoEquipamento, setMostrarNovoEquipamento] = useState(false);
-  const [novoTag, setNovoTag] = useState('');
-  const [novoFabricante, setNovoFabricante] = useState('');
-  const [novoPotencia, setNovoPotencia] = useState('');
-  const [novoPlacaMotor, setNovoPlacaMotor] = useState('');
-  const [novoPlacaAlternador, setNovoPlacaAlternador] = useState('');
-  const [novoPeriodicidade, setNovoPeriodicidade] = useState('');
+  const [novoEquipamento, setNovoEquipamento] = useState({ ...EQUIPAMENTO_FORM_VAZIO });
+  const [novosFiltros, setNovosFiltros] = useState([]);
   const [salvandoEquipamento, setSalvandoEquipamento] = useState(false);
 
   const geradoresMarcados = equipamentos.filter((e) => equipamentosSelecionados[e.id]);
@@ -161,7 +165,7 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
     if (os.unidade_id) {
       const { data: equipamentosDaUnidade } = await supabase
         .from('equipamentos')
-        .select('id, tag, fabricante_gmg, potencia_kva, placa_motor, placa_alternador, periodicidade_manutencao')
+        .select(EQUIPAMENTO_LISTA_SELECT)
         .eq('unidade_id', os.unidade_id)
         .order('tag');
       setEquipamentos(equipamentosDaUnidade || []);
@@ -170,9 +174,31 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
     setLoading(false);
   }
 
+  function alterarNovoEquipamento(campo, valor) {
+    setNovoEquipamento((prev) => ({ ...prev, [campo]: valor }));
+  }
+
+  function alterarEdicaoEquipamento(campo, valor) {
+    setEdicaoEquipamento((prev) => ({ ...prev, [campo]: valor }));
+  }
+
+  function fecharEdicaoEquipamento() {
+    edicaoRequestRef.current += 1;
+    setEquipamentoEditandoId(null);
+    setEdicaoEquipamento({ ...EQUIPAMENTO_FORM_VAZIO });
+    setEdicaoFiltros([]);
+    setCarregandoEdicaoEquipamento(false);
+  }
+
   async function cadastrarNovoEquipamento() {
-    if (!novoTag.trim()) {
+    if (!novoEquipamento.tag.trim()) {
       avisar('Informe a identificação do gerador (ex: GMG 03).', 'Preencha o campo obrigatório');
+      return;
+    }
+
+    const filtrosCheck = validarFiltrosForm(novosFiltros);
+    if (!filtrosCheck.ok) {
+      avisar(filtrosCheck.mensagem, 'Filtros incompletos');
       return;
     }
 
@@ -182,79 +208,121 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
       .from('equipamentos')
       .insert({
         unidade_id: unidadeId,
-        tag: novoTag.trim(),
-        fabricante_gmg: novoFabricante.trim() || null,
-        potencia_kva: novoPotencia ? Number(novoPotencia) : null,
-        placa_motor: novoPlacaMotor.trim() || null,
-        placa_alternador: novoPlacaAlternador.trim() || null,
-        periodicidade_manutencao: novoPeriodicidade?.trim() || null,
+        ...payloadFromValores(novoEquipamento),
       })
-      .select('id, tag, fabricante_gmg, potencia_kva, placa_motor, placa_alternador, periodicidade_manutencao')
+      .select(EQUIPAMENTO_LISTA_SELECT)
       .single();
 
-    setSalvandoEquipamento(false);
-
     if (error) {
+      setSalvandoEquipamento(false);
       console.log(error);
       avisar(error.message || 'Tente novamente.', 'Erro ao cadastrar gerador');
       return;
     }
 
+    if (filtrosCheck.filtros.length > 0) {
+      const { error: erroFiltros } = await supabase.from('equipamento_filtros').insert(
+        filtrosCheck.filtros.map((f) => ({
+          equipamento_id: data.id,
+          tipo_filtro: f.tipo_filtro,
+          numero_peca: f.numero_peca,
+          observacao: f.observacao,
+        }))
+      );
+      if (erroFiltros) {
+        setSalvandoEquipamento(false);
+        avisar(erroFiltros.message, 'Gerador salvo, mas filtros não foram gravados');
+        return;
+      }
+    }
+
+    setSalvandoEquipamento(false);
+
     setEquipamentos((prev) => [...prev, data]);
     setEquipamentosSelecionados((prev) => ({ ...prev, [data.id]: true }));
-    setNovoTag('');
-    setNovoFabricante('');
-    setNovoPotencia('');
-    setNovoPlacaMotor('');
-    setNovoPlacaAlternador('');
-    setNovoPeriodicidade('');
+    setNovoEquipamento({ ...EQUIPAMENTO_FORM_VAZIO });
+    setNovosFiltros([]);
     setMostrarNovoEquipamento(false);
   }
 
-  function abrirEdicaoEquipamento(e) {
+  async function abrirEdicaoEquipamento(e) {
+    const requestId = ++edicaoRequestRef.current;
     setEquipamentoEditandoId(e.id);
-    setEdTag(e.tag || '');
-    setEdFabricante(e.fabricante_gmg || '');
-    setEdPotencia(e.potencia_kva ? String(e.potencia_kva) : '');
-    setEdPlacaMotor(e.placa_motor || '');
-    setEdPlacaAlternador(e.placa_alternador || '');
-    setEdPeriodicidade(e.periodicidade_manutencao || '');
+    setCarregandoEdicaoEquipamento(true);
+    setEdicaoEquipamento(valoresFromEquipamento(e));
+    setEdicaoFiltros([]);
+    setMostrarNovoEquipamento(false);
+
+    const [{ data: completo, error }, { data: filtrosDb, error: erroFiltros }] = await Promise.all([
+      supabase.from('equipamentos').select(EQUIPAMENTO_COMPLETO_SELECT).eq('id', e.id).single(),
+      supabase
+        .from('equipamento_filtros')
+        .select('id, tipo_filtro, numero_peca, observacao')
+        .eq('equipamento_id', e.id)
+        .order('tipo_filtro'),
+    ]);
+
+    if (requestId !== edicaoRequestRef.current) return;
+
+    if (error) {
+      console.log(error);
+      setCarregandoEdicaoEquipamento(false);
+      avisar(error.message || 'Tente novamente.', 'Erro ao carregar gerador');
+      fecharEdicaoEquipamento();
+      return;
+    }
+    if (erroFiltros) console.log(erroFiltros);
+
+    setEdicaoEquipamento(valoresFromEquipamento(completo));
+    setEdicaoFiltros(filtrosFromRows(filtrosDb));
+    setCarregandoEdicaoEquipamento(false);
   }
 
   async function salvarEdicaoEquipamento() {
-    if (!edTag.trim()) {
+    if (!edicaoEquipamento.tag.trim()) {
       avisar('Informe a identificação do gerador (ex: GMG 03).', 'Preencha o campo obrigatório');
       return;
     }
 
+    const filtrosCheck = validarFiltrosForm(edicaoFiltros);
+    if (!filtrosCheck.ok) {
+      avisar(filtrosCheck.mensagem, 'Filtros incompletos');
+      return;
+    }
+
+    const idEditando = equipamentoEditandoId;
     setSalvandoEdicaoEquipamento(true);
-
-    const dadosAtualizados = {
-      tag: edTag.trim(),
-      fabricante_gmg: edFabricante.trim() || null,
-      potencia_kva: edPotencia ? Number(edPotencia) : null,
-      placa_motor: edPlacaMotor.trim() || null,
-      placa_alternador: edPlacaAlternador.trim() || null,
-      periodicidade_manutencao: edPeriodicidade?.trim() || null,
-    };
-
-    const { error } = await supabase
-      .from('equipamentos')
-      .update(dadosAtualizados)
-      .eq('id', equipamentoEditandoId);
-
-    setSalvandoEdicaoEquipamento(false);
+    const dadosAtualizados = payloadFromValores(edicaoEquipamento);
+    const { error } = await supabase.from('equipamentos').update(dadosAtualizados).eq('id', idEditando);
 
     if (error) {
+      setSalvandoEdicaoEquipamento(false);
       console.log(error);
       avisar(error.message || 'Tente novamente.', 'Erro ao salvar gerador');
       return;
     }
 
+    const erroFiltros = await substituirFiltrosEquipamento(supabase, idEditando, filtrosCheck.filtros);
+    setSalvandoEdicaoEquipamento(false);
+
+    if (erroFiltros) {
+      avisar(erroFiltros.message || 'Tente novamente.', 'Gerador salvo, mas filtros não foram gravados');
+      return;
+    }
+
     setEquipamentos((prev) =>
-      prev.map((e) => (e.id === equipamentoEditandoId ? { ...e, ...dadosAtualizados } : e))
+      prev.map((eq) =>
+        eq.id === idEditando
+          ? {
+              ...eq,
+              tag: dadosAtualizados.tag,
+              fabricante_gmg: dadosAtualizados.fabricante_gmg,
+              periodicidade_manutencao: dadosAtualizados.periodicidade_manutencao,
+            }
+          : eq
+      )
     );
-    setEquipamentoEditandoId(null);
+    fecharEdicaoEquipamento();
   }
 
   async function salvar() {
@@ -524,64 +592,22 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
 
             {equipamentoEditandoId === e.id ? (
               <View style={styles.novoEquipamentoForm}>
-                <TextInput
-                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
-                  placeholder="Identificação (ex: GMG 03) *"
-                  value={edTag}
-                  onChangeText={setEdTag}
-                />
-                <TextInput
-                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
-                  placeholder="Fabricante do GMG"
-                  value={edFabricante}
-                  onChangeText={setEdFabricante}
-                />
-                <TextInput
-                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
-                  placeholder="Potência (KVA)"
-                  value={edPotencia}
-                  onChangeText={setEdPotencia}
-                  keyboardType="numeric"
-                />
-                <TextInput
-                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
-                  placeholder="Placa do motor"
-                  value={edPlacaMotor}
-                  onChangeText={setEdPlacaMotor}
-                />
-                <TextInput
-                style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
-                  placeholder="Placa do alternador"
-                  value={edPlacaAlternador}
-                  onChangeText={setEdPlacaAlternador}
-                />
-                <Text style={[styles.label, { color: cores.texto, marginTop: 4 }]}>Periodicidade de manutenção</Text>
-                <View style={styles.tipoRow}>
-                  {PERIODICIDADES_MANUTENCAO.map((p) => {
-                    const selecionado = edPeriodicidade === p.valor;
-                    return (
-                      <TouchableOpacity
-                        key={p.valor}
-                        style={[styles.tipoButton, selecionado && styles.tipoButtonSelecionado]}
-                        onPress={() => setEdPeriodicidade(selecionado ? '' : p.valor)}
-                      >
-                        <Text
-                          style={
-                            selecionado
-                              ? styles.tipoTextoSelecionado
-                              : [styles.tipoTexto, { color: cores.texto }]
-                          }
-                        >
-                          {p.rotulo}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                {carregandoEdicaoEquipamento ? (
+                  <Text style={[styles.avisoVazio, { color: cores.textoSuave }]}>
+                    Carregando dados do gerador...
+                  </Text>
+                ) : (
+                  <FormularioEquipamento
+                    valores={edicaoEquipamento}
+                    onChange={alterarEdicaoEquipamento}
+                    filtros={edicaoFiltros}
+                    onChangeFiltros={setEdicaoFiltros}
+                  />
+                )}
                 <View style={styles.linhaBotoesEdicao}>
                   <TouchableOpacity
                     style={styles.cancelarEdicaoBotao}
-                    onPress={() => setEquipamentoEditandoId(null)}
+                    onPress={fecharEdicaoEquipamento}
                   >
                     <Text style={styles.cancelarEdicaoBotaoTexto}>Cancelar</Text>
                   </TouchableOpacity>
@@ -589,7 +615,7 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
                     <Button
                       title={salvandoEdicaoEquipamento ? 'Salvando...' : 'Salvar gerador'}
                       onPress={salvarEdicaoEquipamento}
-                      disabled={salvandoEdicaoEquipamento}
+                      disabled={salvandoEdicaoEquipamento || carregandoEdicaoEquipamento}
                     />
                   </View>
                 </View>
@@ -620,60 +646,12 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
 
       {mostrarNovoEquipamento ? (
         <View style={styles.novoEquipamentoForm}>
-          <TextInput
-            style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
-            placeholder="Identificação (ex: GMG 03) *"
-            value={novoTag}
-            onChangeText={setNovoTag}
+          <FormularioEquipamento
+            valores={novoEquipamento}
+            onChange={alterarNovoEquipamento}
+            filtros={novosFiltros}
+            onChangeFiltros={setNovosFiltros}
           />
-          <TextInput
-            style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
-            placeholder="Fabricante do GMG"
-            value={novoFabricante}
-            onChangeText={setNovoFabricante}
-          />
-          <TextInput
-            style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
-            placeholder="Potência (KVA)"
-            value={novoPotencia}
-            onChangeText={setNovoPotencia}
-            keyboardType="numeric"
-          />
-          <TextInput
-            style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
-            placeholder="Placa do motor"
-            value={novoPlacaMotor}
-            onChangeText={setNovoPlacaMotor}
-          />
-          <TextInput
-            style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
-            placeholder="Placa do alternador"
-            value={novoPlacaAlternador}
-            onChangeText={setNovoPlacaAlternador}
-          />
-          <Text style={[styles.label, { color: cores.texto, marginTop: 4 }]}>Periodicidade de manutenção</Text>
-          <View style={styles.tipoRow}>
-            {PERIODICIDADES_MANUTENCAO.map((p) => {
-              const selecionado = novoPeriodicidade === p.valor;
-              return (
-                <TouchableOpacity
-                  key={p.valor}
-                  style={[styles.tipoButton, selecionado && styles.tipoButtonSelecionado]}
-                  onPress={() => setNovoPeriodicidade(selecionado ? '' : p.valor)}
-                >
-                  <Text
-                    style={
-                      selecionado
-                        ? styles.tipoTextoSelecionado
-                        : [styles.tipoTexto, { color: cores.texto }]
-                    }
-                  >
-                    {p.rotulo}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
           <Button
             title={salvandoEquipamento ? 'Salvando...' : 'Salvar gerador'}
             onPress={cadastrarNovoEquipamento}
@@ -683,7 +661,10 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
       ) : (
         <TouchableOpacity
           style={styles.novoEquipamentoBotao}
-          onPress={() => setMostrarNovoEquipamento(true)}
+          onPress={() => {
+            fecharEdicaoEquipamento();
+            setMostrarNovoEquipamento(true);
+          }}
         >
           <Text style={styles.novoEquipamentoBotaoTexto}>+ Cadastrar novo gerador</Text>
         </TouchableOpacity>
