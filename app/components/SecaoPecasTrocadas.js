@@ -15,6 +15,7 @@ import { useTema } from '../lib/tema';
 import { rotuloTipoFiltro } from '../lib/constantes';
 import DatePickerCampo from './DatePickerCampo';
 import { textoProximaTroca, dataSugeridaProximaTroca } from '../lib/pecasHistorico';
+import { uriParaBlobJpeg, extensaoDeContentType } from '../lib/fotosUpload';
 
 function formatarDataHora(valor) {
   if (!valor) return '';
@@ -94,13 +95,13 @@ export default function SecaoPecasTrocadas({
   }
 
   async function enviarFotoPeca(relatorioPecaId, uri) {
-    const respostaFetch = await fetch(uri);
-    const blob = await respostaFetch.blob();
-    const nomeArquivo = `pecas/${relatorioPecaId}/${Date.now()}.jpg`;
+    const { blob, contentType } = await uriParaBlobJpeg(uri);
+    const extensao = extensaoDeContentType(contentType);
+    const nomeArquivo = `pecas/${relatorioPecaId}/${Date.now()}.${extensao}`;
 
     const { error: uploadError } = await supabase.storage
       .from('evidencias')
-      .upload(nomeArquivo, blob, { contentType: 'image/jpeg' });
+      .upload(nomeArquivo, blob, { contentType: contentType || 'image/jpeg', upsert: false });
 
     if (uploadError) {
       throw new Error(uploadError.message || 'Erro ao enviar foto');

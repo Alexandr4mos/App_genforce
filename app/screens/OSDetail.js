@@ -25,6 +25,7 @@ import AssinaturaCampo from '../components/AssinaturaCampo';
 import SecaoChecklist from '../components/SecaoChecklist';
 import SecaoPecasTrocadas from '../components/SecaoPecasTrocadas';
 import SecaoColapsavel from '../components/SecaoColapsavel';
+import { uriParaBlobJpeg, extensaoDeContentType } from '../lib/fotosUpload';
 
 // Chave composta: cada resposta pertence a um gerador (os_equipamento) + item específico.
 // Usar só o id do item causava "vazamento" de resposta entre GMG 01 e GMG 02 quando
@@ -118,6 +119,7 @@ export default function OSDetail({ osId, userId, onBack }) {
   const [preenchimentoPeca, setPreenchimentoPeca] = useState({});
   const [osTipos, setOsTipos] = useState([]);
   const [modalVisivel, setModalVisivel] = useState(null);
+  const [fotoAmpliada, setFotoAmpliada] = useState(null);
   const [equipamentosAbertos, setEquipamentosAbertos] = useState({});
   const [usuarioPapel, setUsuarioPapel] = useState(null);
   const [mostrarCorrecao, setMostrarCorrecao] = useState(false);
@@ -744,13 +746,25 @@ export default function OSDetail({ osId, userId, onBack }) {
 
     setUploading(k);
 
-    const respostaFetch = await fetch(uri);
-    const blob = await respostaFetch.blob();
-    const nomeArquivo = `${respostaId}/${Date.now()}.jpg`;
+    let blob;
+    let contentType = 'image/jpeg';
+    try {
+      const convertido = await uriParaBlobJpeg(uri);
+      blob = convertido.blob;
+      contentType = convertido.contentType || 'image/jpeg';
+    } catch (err) {
+      console.log(err);
+      avisar(err.message || 'Não foi possível ler a foto tirada.', 'Erro na foto');
+      setUploading(null);
+      return;
+    }
+
+    const extensao = extensaoDeContentType(contentType);
+    const nomeArquivo = `${respostaId}/${Date.now()}.${extensao}`;
 
     const { error: uploadError } = await supabase.storage
       .from('evidencias')
-      .upload(nomeArquivo, blob, { contentType: 'image/jpeg' });
+      .upload(nomeArquivo, blob, { contentType, upsert: false });
 
     if (uploadError) {
       console.log(uploadError);
@@ -943,13 +957,25 @@ export default function OSDetail({ osId, userId, onBack }) {
   async function enviarFotoParaPendencia(pendenciaId, uri) {
     setUploadingPendencia(pendenciaId);
 
-    const respostaFetch = await fetch(uri);
-    const blob = await respostaFetch.blob();
-    const nomeArquivo = `pendencias/${pendenciaId}/${Date.now()}.jpg`;
+    let blob;
+    let contentType = 'image/jpeg';
+    try {
+      const convertido = await uriParaBlobJpeg(uri);
+      blob = convertido.blob;
+      contentType = convertido.contentType || 'image/jpeg';
+    } catch (err) {
+      console.log(err);
+      avisar(err.message || 'Não foi possível ler a foto tirada.', 'Erro na foto');
+      setUploadingPendencia(null);
+      return;
+    }
+
+    const extensao = extensaoDeContentType(contentType);
+    const nomeArquivo = `pendencias/${pendenciaId}/${Date.now()}.${extensao}`;
 
     const { error: uploadError } = await supabase.storage
       .from('evidencias')
-      .upload(nomeArquivo, blob, { contentType: 'image/jpeg' });
+      .upload(nomeArquivo, blob, { contentType, upsert: false });
 
     if (uploadError) {
       console.log(uploadError);
@@ -1428,7 +1454,9 @@ export default function OSDetail({ osId, userId, onBack }) {
           <View style={styles.fotosSectionMini}>
             {(fotosPorItem[k] || []).map((foto) => (
               <View key={foto.id} style={styles.fotoWrapperMini}>
-                <Image source={{ uri: foto.url }} style={styles.fotoThumbMini} />
+                <TouchableOpacity onPress={() => setFotoAmpliada(foto.url)} activeOpacity={0.85}>
+                  <Image source={{ uri: foto.url }} style={styles.fotoThumbMini} />
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.editarFotoBotao}
                   onPress={() => editarLegendaFoto(eq.id, item.id, foto)}
@@ -1789,7 +1817,9 @@ export default function OSDetail({ osId, userId, onBack }) {
                       <View style={styles.fotosRow}>
                         {(fotosPorPendencia[p.id] || []).map((foto) => (
                           <View key={foto.id} style={styles.fotoWrapper}>
-                            <Image source={{ uri: foto.url }} style={styles.fotoThumb} />
+                            <TouchableOpacity onPress={() => setFotoAmpliada(foto.url)} activeOpacity={0.85}>
+                              <Image source={{ uri: foto.url }} style={styles.fotoThumb} />
+                            </TouchableOpacity>
                             <TouchableOpacity
                               style={styles.excluirFotoButton}
                               onPress={() => excluirFotoPendencia(p.id, foto)}
@@ -2121,6 +2151,19 @@ export default function OSDetail({ osId, userId, onBack }) {
           </TouchableOpacity>
       ) : null}
 
+      <Modal visible={Boolean(fotoAmpliada)} transparent animationType="fade" onRequestClose={() => setFotoAmpliada(null)}>
+        <TouchableOpacity
+          style={styles.fotoAmpliadaOverlay}
+          activeOpacity={1}
+          onPress={() => setFotoAmpliada(null)}
+        >
+          {fotoAmpliada ? (
+            <Image source={{ uri: fotoAmpliada }} style={styles.fotoAmpliadaImg} resizeMode="contain" />
+          ) : null}
+          <Text style={styles.fotoAmpliadaDica}>Toque para fechar</Text>
+        </TouchableOpacity>
+      </Modal>
+
       <Modal visible={modalVisivel === 'info'} transparent animationType="slide" onRequestClose={() => setModalVisivel(null)}>
         <View style={[styles.modalOverlay, { backgroundColor: cores.overlay }]}>
           <View style={[styles.modalPainel, { backgroundColor: cores.fundo }]}>
@@ -2291,7 +2334,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   fotoWrapperMini: { width: 54, marginRight: 8, marginBottom: 8, position: 'relative' },
-  fotoThumbMini: { width: 54, height: 54, borderRadius: 6 },
+  fotoThumbMini: { width: 54, height: 54, borderRadius: 6, backgroundColor: '#eee' },
   editarFotoBotao: {
     position: 'absolute',
     bottom: -6,
@@ -2302,6 +2345,7 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 2,
   },
   editarFotoTexto: { color: '#fff', fontSize: 10 },
   excluirFotoButtonMini: {
@@ -2314,8 +2358,18 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 2,
   },
   legendaFotoTexto: { fontSize: 9, color: '#666', marginTop: 2 },
+  fotoAmpliadaOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  fotoAmpliadaImg: { width: '100%', height: '80%' },
+  fotoAmpliadaDica: { color: '#fff', marginTop: 12, fontSize: 13 },
   iconeFotoMini: {
     width: 40,
     height: 40,
