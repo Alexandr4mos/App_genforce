@@ -450,12 +450,14 @@ export default function ListaDeOS({ onBack, onAbrirOS, onEditarOS, onRemanejar, 
   }, [painelSuperior, resultados]);
 
   const temFiltroAtivo =
+    Boolean(clienteId) ||
     filtroStatus ||
     tiposAtivosKey ||
     somenteComPendencia ||
     dateFilter.appliedRange?.start;
 
   const rotulosFiltro = [
+    clienteAtual?.nome ? `Cliente: ${clienteAtual.nome}` : null,
     filtroStatus ? rotuloStatus(filtroStatus) : null,
     ...(tiposAtivosKey ? tiposAtivosKey.split(',').map(rotuloTipo) : []),
     somenteComPendencia ? 'Com pendência aberta' : null,
@@ -541,18 +543,52 @@ export default function ListaDeOS({ onBack, onAbrirOS, onEditarOS, onRemanejar, 
         />
       ) : (
         <Text style={[styles.subtitulo, { color: cores.textoSecundario }]}>
-          OS em aberto ordenadas por prioridade (Alto → Médio → Baixo) e data prevista.
+          Todas as OS em aberto (todos os clientes), ordenadas por prioridade (Alto → Médio → Baixo) e
+          data prevista. Filtrar por cliente é opcional.
         </Text>
       )}
 
       <Text style={[styles.label, { color: cores.texto }]}>Cliente</Text>
+      {clienteId ? (
+        <View style={styles.filtroClienteAtivoRow}>
+          <Text style={[styles.filtroClienteAtivoTexto, { color: cores.texto }]} numberOfLines={1}>
+            Filtrando: {clienteAtual?.nome || 'cliente'}
+          </Text>
+          <TouchableOpacity
+            style={[styles.limparClienteBotao, { borderColor: cores.borda }]}
+            onPress={() => setClienteId(null)}
+          >
+            <Text style={{ color: cores.primario, fontWeight: '600', fontSize: 12 }}>Ver todos</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <Text style={[styles.hintCliente, { color: cores.textoSuave }]}>
+          {painelSuperior === 'prioridade'
+            ? 'Nenhum cliente selecionado — exibindo a visão geral.'
+            : 'Selecione um cliente ou use a busca. Sem seleção, lista todas as OS.'}
+        </Text>
+      )}
       <SeletorCliente
         clientes={clientes}
         clienteId={clienteId}
         onSelecionar={(c) => setClienteId(c.id)}
-        conteudoQuandoBuscaVazia={painelRevisaoVazio}
+        // Fila de revisão só no Calendário (busca vazia). Em Prioridade o seletor
+        // precisa mostrar os clientes para filtro opcional.
+        conteudoQuandoBuscaVazia={
+          painelSuperior === 'calendario' ? painelRevisaoVazio : null
+        }
       />
 
+      {painelSuperior === 'prioridade' && privilegiado && filaRevisao.length > 0 ? (
+        <TouchableOpacity
+          style={[styles.atallhoRevisao, { borderColor: cores.borda, backgroundColor: cores.fundoCard }]}
+          onPress={() => setPainelSuperior('calendario')}
+        >
+          <Text style={{ color: cores.texto, fontSize: 13 }}>
+            {filaRevisao.length} OS aguardando revisão — toque para ver no Calendário
+          </Text>
+        </TouchableOpacity>
+      ) : null}
       <Text style={[styles.label, { color: cores.texto }]}>Status</Text>
           <View style={styles.chipsRow}>
             {STATUS_OS.map((s) => (
@@ -627,7 +663,17 @@ export default function ListaDeOS({ onBack, onAbrirOS, onEditarOS, onRemanejar, 
 
       {loading ? <ActivityIndicator style={{ marginVertical: 16 }} /> : null}
       {!loading && listaExibida.length === 0 ? (
-        <Text style={[styles.vazio, { color: cores.textoSuave }]}>Nenhuma OS encontrada.</Text>
+        <Text style={[styles.vazio, { color: cores.textoSuave }]}>
+          {painelSuperior === 'prioridade'
+            ? 'Nenhuma OS em aberto encontrada.'
+            : 'Nenhuma OS encontrada.'}
+        </Text>
+      ) : null}
+      {!loading && painelSuperior === 'prioridade' && listaExibida.length > 0 ? (
+        <Text style={[styles.contadorPrioridade, { color: cores.textoSecundario }]}>
+          {listaExibida.length} OS em aberto
+          {clienteAtual ? ` · ${clienteAtual.nome}` : ' · todos os clientes'}
+        </Text>
       ) : null}
       {!loading
         ? listaExibida.map((os) => renderCardOS(os, { mostrarPrioridade: painelSuperior === 'prioridade' }))
@@ -714,4 +760,26 @@ const styles = StyleSheet.create({
   filtroAtivoTexto: { fontSize: 13, fontWeight: '600' },
   painelRevisao: { paddingBottom: 4 },
   painelRevisaoTitulo: { fontSize: 14, fontWeight: 'bold', marginBottom: 4 },
+  filtroClienteAtivoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 8,
+  },
+  filtroClienteAtivoTexto: { flex: 1, fontSize: 13, fontWeight: '600' },
+  limparClienteBotao: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  hintCliente: { fontSize: 12, marginBottom: 8, fontStyle: 'italic' },
+  atalhoRevisao: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 12,
+  },
+  contadorPrioridade: { fontSize: 13, fontWeight: '600', marginBottom: 8 },
 });
