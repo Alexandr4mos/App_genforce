@@ -18,11 +18,15 @@
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
     <style>
-      /* Evita flash branco sem conteúdo enquanto o bundle carrega */
+      /* Evita flash branco e estica o wrapper RN Web na altura da tela */
       html,
       body,
       #root {
         height: 100%;
+      }
+      #root {
+        display: flex;
+        flex-direction: column;
       }
       body {
         margin: 0;
