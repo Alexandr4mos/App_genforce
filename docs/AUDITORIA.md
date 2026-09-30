@@ -36,3 +36,8 @@ O app parece "comum" porque: (a) usa o azul padrão do iOS e cinzas neutros sem 
 4. **Painel operacional** (substitui "Desempenho" mantendo o ranking).
 5. **Propagação** da paleta nas demais telas via tokens.
 6. **Verificação** e relatório.
+
+## Status após a implementação
+Resolvidos: 1 (tokens), 2 (sidebar/barra inferior), 3 (painel), 4 (toast/confirmação), 5 (skeletons nas listas e detalhe), 6, 7, 10, 11, 14 parcial (não investigado).
+Parcial: 8 (componentes novos acessíveis; telas antigas não auditadas), 9 (ícones novos nas telas redesenhadas; emojis seguem nas demais).
+Não tratados: 12, 13. Ver `docs/RELATORIO.md`.
