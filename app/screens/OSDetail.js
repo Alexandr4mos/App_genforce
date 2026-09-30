@@ -191,7 +191,7 @@ export default function OSDetail({ osId, userId, onBack }) {
     );
   }
 
-  function recomputarRelatorioSalvo({
+  function motivosRelatorioIncompleto({
     resps = respostasRef.current,
     obsGeral = observacaoGeralRef.current,
     assCliente = assinaturaClienteRef.current,
@@ -199,17 +199,66 @@ export default function OSDetail({ osId, userId, onBack }) {
     eqs = osEquipamentosRef.current,
     gruposOpc = gruposOpcionaisRef.current,
   } = {}) {
-    const ok =
-      checklistCompleto(eqs, resps, gruposOpc) &&
-      Boolean(obsGeral && String(obsGeral).trim()) &&
-      Boolean(assCliente?.imagem_url) &&
-      Boolean(assTecnico?.imagem_url);
+    const motivos = [];
+    if (!eqs || eqs.length === 0) {
+      motivos.push('nenhum gerador vinculado');
+    } else if (!checklistCompleto(eqs, resps, gruposOpc)) {
+      motivos.push('checklist incompleto');
+    }
+    if (!obsGeral || !String(obsGeral).trim()) {
+      motivos.push('observações gerais');
+    }
+    if (!assCliente?.imagem_url) motivos.push('assinatura do cliente');
+    if (!assTecnico?.imagem_url) motivos.push('assinatura do técnico');
+    return motivos;
+  }
+
+  function recomputarRelatorioSalvo(opts = {}) {
+    const ok = motivosRelatorioIncompleto(opts).length === 0;
     setRelatorioSalvo(ok);
     return ok;
   }
 
-  async function loadData(mostrarLoading = true) {
+  /** Persiste imediatamente obs/km se houver debounce pendente (evita perder texto no re-fetch). */
+  async function flushCamposOsPendentes() {
+    const chaves = ['obs_geral', 'km_saida', 'km_retorno'];
+    let haviaPendente = false;
+    chaves.forEach((k) => {
+      if (debounceTimers.current[k]) {
+        clearTimeout(debounceTimers.current[k]);
+        delete debounceTimers.current[k];
+        haviaPendente = true;
+      }
+    });
+
+    const campos = {
+      observacoes_gerais: observacaoGeralRef.current?.trim() || null,
+      km_saida: kmSaidaRef.current === '' ? null : Number(kmSaidaRef.current),
+      km_retorno: kmRetornoRef.current === '' ? null : Number(kmRetornoRef.current),
+    };
+
+    // Sempre grava se há texto local de obs (mesmo sem debounce) — protege contra
+    // loadData sobrescrever com banco vazio após falha de rede silenciosa.
+    if (haviaPendente || campos.observacoes_gerais) {
+      await salvarCamposOs(campos);
+    }
+  }
+
+  async function loadData(mostrarLoading = true, { preservarCamposOsLocais = false } = {}) {
     if (mostrarLoading) setLoading(true);
+
+    // Antes de re-buscar a OS, tenta gravar o que ainda está só na tela.
+    if (preservarCamposOsLocais || observacaoGeralRef.current?.trim()) {
+      try {
+        await flushCamposOsPendentes();
+      } catch (err) {
+        console.log('flushCamposOsPendentes', err);
+      }
+    }
+
+    const obsLocalAntes = observacaoGeralRef.current || '';
+    const kmSaidaLocalAntes = kmSaidaRef.current || '';
+    const kmRetornoLocalAntes = kmRetornoRef.current || '';
 
     const { data: osEq, error: osEqError } = await supabase
       .from('os_equipamentos')
@@ -320,11 +369,26 @@ export default function OSDetail({ osId, userId, onBack }) {
 
     const { data: usuarioAtual } = await supabase.from('usuarios').select('papel').eq('id', userId).single();
     setUsuarioPapel(usuarioAtual?.papel || 'tecnico');
-    const obsGeral = osAtual?.observacoes_gerais || '';
+
+    // Se o banco veio vazio mas a tela ainda tinha texto (debounce/falha de rede),
+    // preserva o local e tenta gravar de novo — assinaturas não sofrem isso porque
+    // só existem após upload bem-sucedido.
+    const obsDb = osAtual?.observacoes_gerais || '';
+    const obsGeral = obsDb.trim() ? obsDb : obsLocalAntes;
+    if (!obsDb.trim() && obsLocalAntes.trim()) {
+      try {
+        await salvarCamposOs({ observacoes_gerais: obsLocalAntes.trim() });
+      } catch (err) {
+        console.log('regravar observacoes_gerais', err);
+      }
+    }
     setObservacaoGeral(obsGeral);
     observacaoGeralRef.current = obsGeral;
-    const kmS = osAtual?.km_saida != null ? String(osAtual.km_saida) : '';
-    const kmR = osAtual?.km_retorno != null ? String(osAtual.km_retorno) : '';
+
+    const kmSDb = osAtual?.km_saida != null ? String(osAtual.km_saida) : '';
+    const kmRDb = osAtual?.km_retorno != null ? String(osAtual.km_retorno) : '';
+    const kmS = kmSDb || kmSaidaLocalAntes;
+    const kmR = kmRDb || kmRetornoLocalAntes;
     setKmSaida(kmS);
     setKmRetorno(kmR);
     kmSaidaRef.current = kmS;
@@ -429,7 +493,7 @@ export default function OSDetail({ osId, userId, onBack }) {
 
   async function atualizarDados() {
     setAtualizando(true);
-    await loadData(false);
+    await loadData(false, { preservarCamposOsLocais: true });
     setAtualizando(false);
     avisar('Dados atualizados com o que os outros técnicos já preencheram.', 'Sincronizado');
   }
@@ -499,23 +563,25 @@ export default function OSDetail({ osId, userId, onBack }) {
       return;
     }
 
-    if (!assinaturaClienteRef.current?.imagem_url || !assinaturaTecnicoRef.current?.imagem_url) {
+    try {
+      await flushCamposOsPendentes();
+    } catch (err) {
+      console.log(err);
       avisar(
-        'Assinaturas do cliente e do técnico são obrigatórias antes do check-out.',
-        'Assinaturas pendentes'
+        err.message || 'Não foi possível salvar as observações gerais. Verifique a conexão e tente de novo.',
+        'Falha ao salvar'
       );
       return;
     }
 
-    if (!relatorioSalvo) {
-      avisar(
-        'Preencha todo o checklist, observações gerais e assinaturas antes de fazer o check-out.',
-        'Relatório incompleto'
-      );
+    const motivos = motivosRelatorioIncompleto();
+    if (motivos.length > 0) {
+      setRelatorioSalvo(false);
+      avisar(`Falta preencher: ${motivos.join(', ')}.`, 'Relatório incompleto');
       return;
     }
 
-    const dadosFrescos = await loadData(false);
+    const dadosFrescos = await loadData(false, { preservarCamposOsLocais: true });
     if (!dadosFrescos) return;
 
     const faltando = [];
@@ -532,13 +598,23 @@ export default function OSDetail({ osId, userId, onBack }) {
       setRelatorioSalvo(false);
       avisar(
         `Outro técnico pode ter deixado itens pendentes em outro gerador. Faltam ${faltando.length} item(ns): ${faltando.slice(0, 3).join(' · ')}`,
-        'Relatório incompleto'
+        'Checklist incompleto'
       );
       return;
     }
 
     if (!observacaoGeralRef.current?.trim()) {
+      setRelatorioSalvo(false);
       avisar('Preencha as observações gerais antes do check-out.', 'Observações obrigatórias');
+      return;
+    }
+
+    if (!assinaturaClienteRef.current?.imagem_url || !assinaturaTecnicoRef.current?.imagem_url) {
+      setRelatorioSalvo(false);
+      avisar(
+        'Assinaturas do cliente e do técnico são obrigatórias antes do check-out.',
+        'Assinaturas pendentes'
+      );
       return;
     }
 
@@ -555,6 +631,8 @@ export default function OSDetail({ osId, userId, onBack }) {
         checkout_lat: lat,
         checkout_lng: lng,
         status: 'concluida',
+        // Garante que o valor da tela não se perde se o flush anterior falhou parcialmente.
+        observacoes_gerais: observacaoGeralRef.current?.trim() || null,
       })
       .eq('id', osId)
       .select(
@@ -1772,7 +1850,7 @@ export default function OSDetail({ osId, userId, onBack }) {
         <Text style={relatorioSalvo ? styles.relatorioSalvoTexto : styles.relatorioNaoSalvoTexto}>
           {relatorioSalvo
             ? '✓ Relatório completo — check-out liberado'
-            : '⚠ Complete checklist, observações e assinaturas para liberar o check-out'}
+            : `⚠ Falta: ${motivosRelatorioIncompleto().join(', ') || 'completar o relatório'} para liberar o check-out`}
         </Text>
       ) : null}
 
