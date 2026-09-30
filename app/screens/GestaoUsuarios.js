@@ -28,6 +28,11 @@ export default function GestaoUsuarios({ onBack, userId }) {
   const [atualizandoId, setAtualizandoId] = useState(null);
   const [usuarioPapelEditando, setUsuarioPapelEditando] = useState(null);
   const [papelSelecionado, setPapelSelecionado] = useState('tecnico');
+  const [usuarioSenhaEditando, setUsuarioSenhaEditando] = useState(null);
+  const [novaSenha, setNovaSenha] = useState('');
+  const [confirmarSenha, setConfirmarSenha] = useState('');
+  const [erroSenha, setErroSenha] = useState('');
+  const [salvandoSenha, setSalvandoSenha] = useState(false);
 
   useEffect(() => {
     carregarUsuarios();
@@ -145,6 +150,72 @@ export default function GestaoUsuarios({ onBack, userId }) {
   function fecharAlterarPapel() {
     setUsuarioPapelEditando(null);
     setPapelSelecionado('tecnico');
+  }
+
+  function abrirRedefinirSenha(u) {
+    setUsuarioSenhaEditando(u);
+    setNovaSenha('');
+    setConfirmarSenha('');
+    setErroSenha('');
+  }
+
+  function fecharRedefinirSenha() {
+    setUsuarioSenhaEditando(null);
+    setNovaSenha('');
+    setConfirmarSenha('');
+    setErroSenha('');
+    setSalvandoSenha(false);
+  }
+
+  async function salvarNovaSenha() {
+    const u = usuarioSenhaEditando;
+    if (!u) return;
+
+    setErroSenha('');
+    if (!novaSenha || novaSenha.length < 6) {
+      setErroSenha('A senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+    if (novaSenha !== confirmarSenha) {
+      setErroSenha('As senhas não coincidem.');
+      return;
+    }
+
+    const confirmado = await confirmarAcao(
+      `Definir nova senha temporária para ${u.nome}? Informe a senha ao usuário por um canal seguro.`
+    );
+    if (!confirmado) return;
+
+    setSalvandoSenha(true);
+    setAtualizandoId(u.id);
+    const { data, error } = await supabase.functions.invoke('admin-redefinir-senha', {
+      body: { user_id: u.id, senha: novaSenha },
+    });
+    setSalvandoSenha(false);
+    setAtualizandoId(null);
+
+    if (error) {
+      let msg = error.message || 'Erro ao redefinir senha.';
+      try {
+        const corpo = await error.context?.json?.();
+        if (corpo?.error) msg = corpo.error;
+      } catch {
+        // mantém msg padrão
+      }
+      setErroSenha(msg);
+      return;
+    }
+
+    if (data?.error) {
+      setErroSenha(data.error);
+      return;
+    }
+
+    fecharRedefinirSenha();
+    avisar(
+      'Senha redefinida. Passe a nova senha ao usuário por um canal seguro.',
+      'Senha atualizada'
+    );
   }
 
   async function salvarPapel() {
@@ -274,6 +345,15 @@ export default function GestaoUsuarios({ onBack, userId }) {
                 >
                   <Text style={[styles.acaoBtnTexto, { color: cores.primario }]}>
                     {processando ? '...' : 'Alterar papel'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.acaoBtn, { borderColor: cores.borda }]}
+                  onPress={() => abrirRedefinirSenha(u)}
+                  disabled={processando}
+                >
+                  <Text style={[styles.acaoBtnTexto, { color: cores.primario }]}>
+                    {processando ? '...' : 'Redefinir senha'}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -473,6 +553,77 @@ export default function GestaoUsuarios({ onBack, userId }) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <Modal
+        visible={Boolean(usuarioSenhaEditando)}
+        transparent
+        animationType="slide"
+        onRequestClose={fecharRedefinirSenha}
+      >
+        <Pressable style={styles.modalOverlay} onPress={fecharRedefinirSenha}>
+          <Pressable
+            style={[styles.modalSheet, { backgroundColor: cores.fundoCard }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={[styles.modalTitulo, { color: cores.texto }]}>Redefinir senha</Text>
+            <Text style={[styles.modalSubtitulo, { color: cores.textoSecundario }]}>
+              {usuarioSenhaEditando?.nome}
+            </Text>
+            <Text style={[styles.ajudaSenha, { color: cores.textoSuave }]}>
+              Defina uma senha temporária e informe ao usuário por um canal seguro. Logins internos
+              (@genforce.app) não recebem e-mail de recuperação.
+            </Text>
+
+            <Text style={[styles.label, { color: cores.texto }]}>Nova senha</Text>
+            <TextInput
+              style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto }]}
+              value={novaSenha}
+              onChangeText={setNovaSenha}
+              placeholder="Mínimo 6 caracteres"
+              placeholderTextColor={cores.placeholder}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <Text style={[styles.label, { color: cores.texto }]}>Confirmar senha</Text>
+            <TextInput
+              style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto }]}
+              value={confirmarSenha}
+              onChangeText={setConfirmarSenha}
+              placeholder="Repita a senha"
+              placeholderTextColor={cores.placeholder}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            {erroSenha ? (
+              <Text style={[styles.erroForm, { color: cores.erro }]}>{erroSenha}</Text>
+            ) : null}
+
+            <View style={styles.modalBotoes}>
+              <TouchableOpacity style={styles.modalBtnSec} onPress={fecharRedefinirSenha}>
+                <Text style={[styles.modalBtnSecTexto, { color: cores.textoSecundario }]}>
+                  Cancelar
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalBtnPri,
+                  { backgroundColor: cores.primario, opacity: salvandoSenha ? 0.7 : 1 },
+                ]}
+                onPress={salvarNovaSenha}
+                disabled={salvandoSenha}
+              >
+                <Text style={styles.modalBtnPriTexto}>
+                  {salvandoSenha ? 'Salvando...' : 'Salvar senha'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -508,15 +659,18 @@ const styles = StyleSheet.create({
   cardPapel: { fontSize: 13, marginTop: 4 },
   statusBadge: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
   statusBadgeTexto: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  acoesRow: { flexDirection: 'row', gap: 8 },
+  acoesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   acaoBtn: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '30%',
+    minWidth: 100,
     borderWidth: 1,
     borderRadius: 8,
     paddingVertical: 8,
     alignItems: 'center',
   },
   acaoBtnTexto: { fontSize: 12, fontWeight: '600' },
+  ajudaSenha: { fontSize: 12, lineHeight: 18, marginBottom: 4 },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',
