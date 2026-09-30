@@ -331,6 +331,175 @@ export default function ListaOS({
     { rotulo: 'Sair', onPress: onSair },
   ];
 
+  function renderCabecalho() {
+    return (
+      <View>
+        <View style={styles.tituloRow}>
+          <TouchableOpacity style={styles.hamburguer} onPress={() => setMenuAberto(true)}>
+            <Text style={[styles.hamburguerTexto, { color: cores.texto }]}>☰</Text>
+          </TouchableOpacity>
+          <Text style={[styles.title, { color: cores.texto }]}>Ordens de Serviço</Text>
+          <TouchableOpacity
+            style={styles.atualizarBotao}
+            onPress={() => fetchOrdens(dateFilter.appliedRange)}
+          >
+            <Text style={[styles.atualizarTexto, { color: cores.primario }]}>↻</Text>
+          </TouchableOpacity>
+        </View>
+
+        <DateRangeFilter
+          estado={dateFilter}
+          onEstado={setDateFilter}
+          onPeriodoAplicado={onPeriodoAplicado}
+        />
+
+        <View style={styles.contadoresRow}>
+          {STATUS_OS.map((s) => (
+            <TouchableOpacity
+              key={s.valor}
+              style={[
+                styles.contadorChip,
+                { borderColor: corDoStatus(s.valor) },
+                filtroStatus === s.valor && { backgroundColor: corDoStatus(s.valor) },
+              ]}
+              onPress={() =>
+                setFiltroStatus((atual) => (atual === s.valor ? null : s.valor))
+              }
+            >
+              <Text
+                style={[
+                  styles.contadorTexto,
+                  { color: filtroStatus === s.valor ? '#fff' : corDoStatus(s.valor) },
+                ]}
+              >
+                {s.rotulo} {contadores[s.valor] || 0}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {filtroStatus ? (
+          <TouchableOpacity
+            style={[styles.filtroAtivoBar, { backgroundColor: cores.primarioFundo }]}
+            onPress={() => setFiltroStatus(null)}
+          >
+            <Text style={[styles.filtroAtivoTexto, { color: cores.primarioTexto }]}>
+              Filtrando: {rotuloStatus(filtroStatus)} · toque para limpar
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
+        <TextInput
+          style={[
+            styles.busca,
+            { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard },
+          ]}
+          placeholder="Buscar cliente, número ou descrição..."
+          placeholderTextColor={cores.placeholder}
+          value={busca}
+          onChangeText={setBusca}
+        />
+
+        <View style={styles.filtrosRow}>
+          <View style={styles.filtroWrap}>
+            <TouchableOpacity
+              style={[styles.filtroBotao, { borderColor: cores.borda, backgroundColor: cores.fundoSecundario }]}
+              onPress={() => setDropdownAberto(dropdownAberto === 'ordenar' ? null : 'ordenar')}
+            >
+              <Text style={[styles.filtroBotaoTexto, { color: cores.texto }]} numberOfLines={1}>
+                {rotuloOrdenacao} ▾
+              </Text>
+            </TouchableOpacity>
+            {dropdownAberto === 'ordenar' ? (
+              <View style={[styles.dropdown, { backgroundColor: cores.fundoCard, borderColor: cores.borda }]}>
+                {OPCOES_ORDENACAO.map((opcao) => (
+                  <TouchableOpacity
+                    key={opcao.valor}
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setOrdenacao(opcao.valor);
+                      setDropdownAberto(null);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.dropdownItemTexto,
+                        { color: cores.texto },
+                        ordenacao === opcao.valor && { color: cores.primario, fontWeight: '700' },
+                      ]}
+                    >
+                      {opcao.rotulo}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null}
+          </View>
+
+          <View style={styles.filtroWrap}>
+            <TouchableOpacity
+              style={[styles.filtroBotao, { borderColor: cores.borda, backgroundColor: cores.fundoSecundario }]}
+              onPress={() => setDropdownAberto(dropdownAberto === 'status' ? null : 'status')}
+            >
+              <Text style={[styles.filtroBotaoTexto, { color: cores.texto }]} numberOfLines={1}>
+                {rotuloFiltroStatus} ▾
+              </Text>
+            </TouchableOpacity>
+            {dropdownAberto === 'status' ? (
+              <View style={[styles.dropdown, { backgroundColor: cores.fundoCard, borderColor: cores.borda }]}>
+                <TouchableOpacity
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setFiltroStatus(null);
+                    setDropdownAberto(null);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.dropdownItemTexto,
+                      { color: cores.texto },
+                      !filtroStatus && { color: cores.primario, fontWeight: '700' },
+                    ]}
+                  >
+                    Todos
+                  </Text>
+                </TouchableOpacity>
+                {STATUS_OS.map((s) => (
+                  <TouchableOpacity
+                    key={s.valor}
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setFiltroStatus(s.valor);
+                      setDropdownAberto(null);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.dropdownItemTexto,
+                        { color: cores.texto },
+                        filtroStatus === s.valor && { color: cores.primario, fontWeight: '700' },
+                      ]}
+                    >
+                      {s.rotulo}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null}
+          </View>
+        </View>
+
+        {loading ? <ActivityIndicator style={{ marginVertical: 12 }} /> : null}
+        {errorMsg ? (
+          <View style={styles.erroBox}>
+            <Text style={[styles.error, { color: cores.erro }]}>{errorMsg}</Text>
+            <Button title="Tentar de novo" onPress={() => fetchOrdens(dateFilter.appliedRange)} />
+          </View>
+        ) : null}
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: cores.fundo }]}>
       <MenuLateral
@@ -340,174 +509,15 @@ export default function ListaOS({
         itens={itensMenu}
       />
 
-      <View style={styles.tituloRow}>
-        <TouchableOpacity style={styles.hamburguer} onPress={() => setMenuAberto(true)}>
-          <Text style={[styles.hamburguerTexto, { color: cores.texto }]}>☰</Text>
-        </TouchableOpacity>
-        <Text style={[styles.title, { color: cores.texto }]}>Ordens de Serviço</Text>
-        <TouchableOpacity
-          style={styles.atualizarBotao}
-          onPress={() => fetchOrdens(dateFilter.appliedRange)}
-        >
-          <Text style={[styles.atualizarTexto, { color: cores.primario }]}>↻</Text>
-        </TouchableOpacity>
-      </View>
-
-      <DateRangeFilter
-        estado={dateFilter}
-        onEstado={setDateFilter}
-        onPeriodoAplicado={onPeriodoAplicado}
-      />
-
-      <View style={styles.contadoresRow}>
-        {STATUS_OS.map((s) => (
-          <TouchableOpacity
-            key={s.valor}
-            style={[
-              styles.contadorChip,
-              { borderColor: corDoStatus(s.valor) },
-              filtroStatus === s.valor && { backgroundColor: corDoStatus(s.valor) },
-            ]}
-            onPress={() =>
-              setFiltroStatus((atual) => (atual === s.valor ? null : s.valor))
-            }
-          >
-            <Text
-              style={[
-                styles.contadorTexto,
-                { color: filtroStatus === s.valor ? '#fff' : corDoStatus(s.valor) },
-              ]}
-            >
-              {s.rotulo} {contadores[s.valor] || 0}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {filtroStatus ? (
-        <TouchableOpacity
-          style={[styles.filtroAtivoBar, { backgroundColor: cores.primarioFundo }]}
-          onPress={() => setFiltroStatus(null)}
-        >
-          <Text style={[styles.filtroAtivoTexto, { color: cores.primarioTexto }]}>
-            Filtrando: {rotuloStatus(filtroStatus)} · toque para limpar
-          </Text>
-        </TouchableOpacity>
-      ) : null}
-
-      <TextInput
-        style={[
-          styles.busca,
-          { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard },
-        ]}
-        placeholder="Buscar cliente, número ou descrição..."
-        placeholderTextColor={cores.placeholder}
-        value={busca}
-        onChangeText={setBusca}
-      />
-
-      <View style={styles.filtrosRow}>
-        <View style={styles.filtroWrap}>
-          <TouchableOpacity
-            style={[styles.filtroBotao, { borderColor: cores.borda, backgroundColor: cores.fundoSecundario }]}
-            onPress={() => setDropdownAberto(dropdownAberto === 'ordenar' ? null : 'ordenar')}
-          >
-            <Text style={[styles.filtroBotaoTexto, { color: cores.texto }]} numberOfLines={1}>
-              {rotuloOrdenacao} ▾
-            </Text>
-          </TouchableOpacity>
-          {dropdownAberto === 'ordenar' ? (
-            <View style={[styles.dropdown, { backgroundColor: cores.fundoCard, borderColor: cores.borda }]}>
-              {OPCOES_ORDENACAO.map((opcao) => (
-                <TouchableOpacity
-                  key={opcao.valor}
-                  style={styles.dropdownItem}
-                  onPress={() => {
-                    setOrdenacao(opcao.valor);
-                    setDropdownAberto(null);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.dropdownItemTexto,
-                      { color: cores.texto },
-                      ordenacao === opcao.valor && { color: cores.primario, fontWeight: '700' },
-                    ]}
-                  >
-                    {opcao.rotulo}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : null}
-        </View>
-
-        <View style={styles.filtroWrap}>
-          <TouchableOpacity
-            style={[styles.filtroBotao, { borderColor: cores.borda, backgroundColor: cores.fundoSecundario }]}
-            onPress={() => setDropdownAberto(dropdownAberto === 'status' ? null : 'status')}
-          >
-            <Text style={[styles.filtroBotaoTexto, { color: cores.texto }]} numberOfLines={1}>
-              {rotuloFiltroStatus} ▾
-            </Text>
-          </TouchableOpacity>
-          {dropdownAberto === 'status' ? (
-            <View style={[styles.dropdown, { backgroundColor: cores.fundoCard, borderColor: cores.borda }]}>
-              <TouchableOpacity
-                style={styles.dropdownItem}
-                onPress={() => {
-                  setFiltroStatus(null);
-                  setDropdownAberto(null);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.dropdownItemTexto,
-                    { color: cores.texto },
-                    !filtroStatus && { color: cores.primario, fontWeight: '700' },
-                  ]}
-                >
-                  Todos
-                </Text>
-              </TouchableOpacity>
-              {STATUS_OS.map((s) => (
-                <TouchableOpacity
-                  key={s.valor}
-                  style={styles.dropdownItem}
-                  onPress={() => {
-                    setFiltroStatus(s.valor);
-                    setDropdownAberto(null);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.dropdownItemTexto,
-                      { color: cores.texto },
-                      filtroStatus === s.valor && { color: cores.primario, fontWeight: '700' },
-                    ]}
-                  >
-                    {s.rotulo}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : null}
-        </View>
-      </View>
-
-      {loading ? <ActivityIndicator style={{ marginVertical: 12 }} /> : null}
-      {errorMsg ? (
-        <View style={styles.erroBox}>
-          <Text style={[styles.error, { color: cores.erro }]}>{errorMsg}</Text>
-          <Button title="Tentar de novo" onPress={() => fetchOrdens(dateFilter.appliedRange)} />
-        </View>
-      ) : null}
-
       <FlatList
+        style={styles.lista}
+        contentContainerStyle={styles.listaConteudo}
         data={ordensVisiveis}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderCard}
-        extraData={{ filtroStatus, busca, ordenacao, cores }}
+        ListHeaderComponent={renderCabecalho}
+        stickyHeaderIndices={[]}
+        extraData={{ filtroStatus, busca, ordenacao, cores, dropdownAberto, contadores }}
         onScrollBeginDrag={() => {
           setDropdownAberto(null);
           setMenuAbertoId(null);
@@ -529,7 +539,9 @@ export default function ListaOS({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 60, paddingHorizontal: 16, backgroundColor: '#fff' },
+  container: { flex: 1, paddingTop: 60, backgroundColor: '#fff' },
+  lista: { flex: 1 },
+  listaConteudo: { paddingHorizontal: 16, paddingBottom: 40 },
   tituloRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   hamburguer: { paddingRight: 10, paddingVertical: 4 },
   hamburguerTexto: { fontSize: 26, fontWeight: 'bold' },
