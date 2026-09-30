@@ -13,6 +13,7 @@ export default function SecaoChecklist({
   children,
   onSalvarSecao,
   salvandoSecao,
+  somenteLeitura = false,
 }) {
   const { cores } = useTema();
   const bordaCor = corBordaLateral ?? (completa ? '#4caf50' : cores.primario);
@@ -47,15 +48,17 @@ export default function SecaoChecklist({
       {aberta ? (
         <View style={styles.corpo}>
           {children}
-          <TouchableOpacity
-            style={[styles.salvarSecaoBotao, { borderColor: cores.primario }]}
-            onPress={onSalvarSecao}
-            disabled={salvandoSecao}
-          >
-            <Text style={[styles.salvarSecaoTexto, { color: cores.primario }]}>
-              {salvandoSecao ? 'Salvando seção...' : 'Salvar seção'}
-            </Text>
-          </TouchableOpacity>
+          {!somenteLeitura ? (
+            <TouchableOpacity
+              style={[styles.salvarSecaoBotao, { borderColor: cores.primario }]}
+              onPress={onSalvarSecao}
+              disabled={salvandoSecao}
+            >
+              <Text style={[styles.salvarSecaoTexto, { color: cores.primario }]}>
+                {salvandoSecao ? 'Salvando seção...' : 'Salvar seção'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       ) : null}
     </View>

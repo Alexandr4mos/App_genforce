@@ -1225,6 +1225,10 @@ export default function OSDetail({ osId, userId, onBack }) {
   }
 
   async function salvarRelatorioCompleto() {
+    if (osInfo?.status === 'finalizado') {
+      avisar('OS finalizada — o relatório não pode mais ser alterado.', 'Somente leitura');
+      return;
+    }
     setSalvandoRelatorio(true);
     setStatusSalvamento('salvando');
 
@@ -1492,18 +1496,22 @@ export default function OSDetail({ osId, userId, onBack }) {
                 <TouchableOpacity onPress={() => setFotoAmpliada(foto.url)} activeOpacity={0.85}>
                   <Image source={{ uri: foto.url }} style={styles.fotoThumbMini} />
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.editarFotoBotao}
-                  onPress={() => editarLegendaFoto(eq.id, item.id, foto)}
-                >
-                  <Text style={styles.editarFotoTexto}>✎</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.excluirFotoButtonMini}
-                  onPress={() => excluirFoto(eq.id, item.id, foto)}
-                >
-                  <Text style={styles.excluirFotoTexto}>×</Text>
-                </TouchableOpacity>
+                {editavel ? (
+                  <>
+                    <TouchableOpacity
+                      style={styles.editarFotoBotao}
+                      onPress={() => editarLegendaFoto(eq.id, item.id, foto)}
+                    >
+                      <Text style={styles.editarFotoTexto}>✎</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.excluirFotoButtonMini}
+                      onPress={() => excluirFoto(eq.id, item.id, foto)}
+                    >
+                      <Text style={styles.excluirFotoTexto}>×</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : null}
                 {foto.legenda ? (
                   <Text style={[styles.legendaFotoTexto, { color: cores.textoSuave }]} numberOfLines={1}>
                     {foto.legenda}
@@ -1512,21 +1520,25 @@ export default function OSDetail({ osId, userId, onBack }) {
               </View>
             ))}
 
-            <TouchableOpacity
-              style={[styles.iconeFotoMini, { borderColor: cores.primario }]}
-              onPress={() => tirarFoto(eq.id, item.id)}
-              disabled={uploading === k}
-            >
-              <Text style={styles.iconeFotoMiniTexto}>{uploading === k ? '…' : '📷'}</Text>
-            </TouchableOpacity>
+            {editavel ? (
+              <>
+                <TouchableOpacity
+                  style={[styles.iconeFotoMini, { borderColor: cores.primario }]}
+                  onPress={() => tirarFoto(eq.id, item.id)}
+                  disabled={uploading === k}
+                >
+                  <Text style={styles.iconeFotoMiniTexto}>{uploading === k ? '…' : '📷'}</Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.iconeFotoMini, { borderColor: cores.primario }]}
-              onPress={() => escolherDaGaleria(eq.id, item.id)}
-              disabled={uploading === k}
-            >
-              <Text style={styles.iconeFotoMiniTexto}>🖼</Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.iconeFotoMini, { borderColor: cores.primario }]}
+                  onPress={() => escolherDaGaleria(eq.id, item.id)}
+                  disabled={uploading === k}
+                >
+                  <Text style={styles.iconeFotoMiniTexto}>🖼</Text>
+                </TouchableOpacity>
+              </>
+            ) : null}
           </View>
         ) : (
           <Text style={[styles.avisoSalvarPrimeiro, { color: cores.placeholder }]}>
@@ -1546,6 +1558,7 @@ export default function OSDetail({ osId, userId, onBack }) {
   }
 
   const concluida = osConcluida(osInfo?.status);
+  const somenteLeitura = osInfo?.status === 'finalizado';
   const privilegiado = usuarioPapel === 'admin' || usuarioPapel === 'supervisor';
   const statusOs = statusEfetivo(osInfo);
   const corStatus = corDoStatus(statusOs);
@@ -1803,6 +1816,7 @@ export default function OSDetail({ osId, userId, onBack }) {
                               },
                             ]}
                             value={textoEdicaoPendencia[p.id] ?? p.item_solicitado}
+                            editable={!somenteLeitura}
                             onChangeText={(texto) =>
                               setTextoEdicaoPendencia((prev) => ({ ...prev, [p.id]: texto }))
                             }
@@ -1813,7 +1827,7 @@ export default function OSDetail({ osId, userId, onBack }) {
                           </Text>
                         )}
 
-                        {editandoPendenciaId === p.id ? (
+                        {!somenteLeitura && editandoPendenciaId === p.id ? (
                           <TouchableOpacity
                             style={styles.confirmarEdicaoButton}
                             onPress={() => salvarEdicaoPendencia(eq.equipamento_id, p.id)}
@@ -1821,7 +1835,7 @@ export default function OSDetail({ osId, userId, onBack }) {
                           >
                             <Text style={styles.confirmarEdicaoTexto}>✓</Text>
                           </TouchableOpacity>
-                        ) : (
+                        ) : !somenteLeitura ? (
                           <TouchableOpacity
                             style={[styles.editarPendenciaButton, { borderColor: cores.primario }]}
                             onPress={() => {
@@ -1836,7 +1850,7 @@ export default function OSDetail({ osId, userId, onBack }) {
                               ✎
                             </Text>
                           </TouchableOpacity>
-                        )}
+                        ) : null}
 
                         <View
                           style={[
@@ -1860,16 +1874,19 @@ export default function OSDetail({ osId, userId, onBack }) {
                             <TouchableOpacity onPress={() => setFotoAmpliada(foto.url)} activeOpacity={0.85}>
                               <Image source={{ uri: foto.url }} style={styles.fotoThumb} />
                             </TouchableOpacity>
-                            <TouchableOpacity
-                              style={styles.excluirFotoButton}
-                              onPress={() => excluirFotoPendencia(p.id, foto)}
-                            >
-                              <Text style={styles.excluirFotoTexto}>×</Text>
-                            </TouchableOpacity>
+                            {!somenteLeitura ? (
+                              <TouchableOpacity
+                                style={styles.excluirFotoButton}
+                                onPress={() => excluirFotoPendencia(p.id, foto)}
+                              >
+                                <Text style={styles.excluirFotoTexto}>×</Text>
+                              </TouchableOpacity>
+                            ) : null}
                           </View>
                         ))}
                       </View>
 
+                      {!somenteLeitura ? (
                       <View style={styles.fotoBotoesRow}>
                         <TouchableOpacity
                           style={[styles.fotoBotao, styles.fotoBotaoCamera, { borderColor: cores.primario, backgroundColor: cores.primario }]}
@@ -1890,8 +1907,9 @@ export default function OSDetail({ osId, userId, onBack }) {
                           </Text>
                         </TouchableOpacity>
                       </View>
+                      ) : null}
 
-                      {p.status !== 'resolvida' ? (
+                      {p.status !== 'resolvida' && !somenteLeitura ? (
                         <View style={styles.baixaBlock}>
                           <TextInput
                             style={[
@@ -1914,16 +1932,16 @@ export default function OSDetail({ osId, userId, onBack }) {
                             onPress={() => darBaixaPendencia(eq.equipamento_id, p.id)}
                           />
                         </View>
-                      ) : (
+                      ) : p.status === 'resolvida' ? (
                         <Text style={styles.pendenciaResolvidaTexto}>
                           Resolvida: {p.observacao_baixa}
                         </Text>
-                      )}
+                      ) : null}
                     </View>
                   ))
                 )}
 
-                {mostrarFormPendencia[eq.equipamento_id] ? (
+                {somenteLeitura ? null : mostrarFormPendencia[eq.equipamento_id] ? (
                   <View style={styles.novaPendenciaForm}>
                     <TextInput
                       style={[
@@ -2010,7 +2028,7 @@ export default function OSDetail({ osId, userId, onBack }) {
                 onLimparPreenchimento={() =>
                   setPreenchimentoPeca((prev) => ({ ...prev, [eq.equipamento_id]: null }))
                 }
-                somenteLeitura={concluida}
+                somenteLeitura={concluida || somenteLeitura}
               />
 
               {checklistLiberado ? (
@@ -2043,8 +2061,9 @@ export default function OSDetail({ osId, userId, onBack }) {
                     }
                     onSalvarSecao={() => salvarSecao(eq, itensGrupo, chaveSecao)}
                     salvandoSecao={salvandoSecao === chaveSecao}
+                    somenteLeitura={somenteLeitura}
                   >
-                    {itensGrupo.map((item) => renderItemChecklist(eq, item, true))}
+                    {itensGrupo.map((item) => renderItemChecklist(eq, item, !somenteLeitura))}
                   </SecaoChecklist>
                 );
               })
@@ -2086,7 +2105,9 @@ export default function OSDetail({ osId, userId, onBack }) {
               placeholder="Observações gerais sobre a manutenção..."
               placeholderTextColor={cores.placeholder}
               value={observacaoGeral}
+              editable={!somenteLeitura}
               onChangeText={(texto) => {
+                if (somenteLeitura) return;
                 setObservacaoGeral(texto);
                 observacaoGeralRef.current = texto;
                 setRelatorioSalvo(false);
@@ -2094,11 +2115,12 @@ export default function OSDetail({ osId, userId, onBack }) {
                   observacoes_gerais: observacaoGeralRef.current,
                 }));
               }}
-              onBlur={() =>
+              onBlur={() => {
+                if (somenteLeitura) return;
                 salvarOsNoBlur('obs_geral', () => ({
                   observacoes_gerais: observacaoGeralRef.current,
-                }))
-              }
+                }));
+              }}
               multiline
             />
 
@@ -2118,18 +2140,21 @@ export default function OSDetail({ osId, userId, onBack }) {
               placeholderTextColor={cores.placeholder}
               keyboardType="numeric"
               value={kmSaida}
+              editable={!somenteLeitura}
               onChangeText={(texto) => {
+                if (somenteLeitura) return;
                 setKmSaida(texto);
                 kmSaidaRef.current = texto;
                 agendarSalvarOs('km_saida', () => ({
                   km_saida: kmSaidaRef.current === '' ? null : Number(kmSaidaRef.current),
                 }));
               }}
-              onBlur={() =>
+              onBlur={() => {
+                if (somenteLeitura) return;
                 salvarOsNoBlur('km_saida', () => ({
                   km_saida: kmSaidaRef.current === '' ? null : Number(kmSaidaRef.current),
-                }))
-              }
+                }));
+              }}
             />
 
             <Text style={[styles.campoRotulo, { color: cores.texto }]}>
@@ -2148,18 +2173,21 @@ export default function OSDetail({ osId, userId, onBack }) {
               placeholderTextColor={cores.placeholder}
               keyboardType="numeric"
               value={kmRetorno}
+              editable={!somenteLeitura}
               onChangeText={(texto) => {
+                if (somenteLeitura) return;
                 setKmRetorno(texto);
                 kmRetornoRef.current = texto;
                 agendarSalvarOs('km_retorno', () => ({
                   km_retorno: kmRetornoRef.current === '' ? null : Number(kmRetornoRef.current),
                 }));
               }}
-              onBlur={() =>
+              onBlur={() => {
+                if (somenteLeitura) return;
                 salvarOsNoBlur('km_retorno', () => ({
                   km_retorno: kmRetornoRef.current === '' ? null : Number(kmRetornoRef.current),
-                }))
-              }
+                }));
+              }}
             />
 
             <AssinaturaCampo
@@ -2167,6 +2195,7 @@ export default function OSDetail({ osId, userId, onBack }) {
               assinatura={assinaturaCliente}
               onSalvar={(dados) => salvarAssinatura('cliente', dados)}
               onExcluir={() => excluirAssinatura('cliente')}
+              desabilitado={somenteLeitura}
             />
 
             <AssinaturaCampo
@@ -2174,12 +2203,13 @@ export default function OSDetail({ osId, userId, onBack }) {
               assinatura={assinaturaTecnico}
               onSalvar={(dados) => salvarAssinatura('tecnico', dados)}
               onExcluir={() => excluirAssinatura('tecnico')}
+              desabilitado={somenteLeitura}
             />
           </View>
         </SecaoColapsavel>
       ) : null}
 
-      {osEquipamentos.length > 0 ? (
+      {osEquipamentos.length > 0 && !somenteLeitura ? (
           <TouchableOpacity
             style={[styles.salvarRelatorioBotao, { backgroundColor: cores.primario }]}
             onPress={salvarRelatorioCompleto}
@@ -2189,6 +2219,12 @@ export default function OSDetail({ osId, userId, onBack }) {
               {salvandoRelatorio ? 'Salvando relatório...' : '💾 Salvar Relatório'}
             </Text>
           </TouchableOpacity>
+      ) : null}
+
+      {somenteLeitura ? (
+        <Text style={[styles.osFinalizadaAviso, { color: cores.textoSecundario }]}>
+          OS finalizada — relatório somente leitura (PDF já gerado).
+        </Text>
       ) : null}
 
       <Modal visible={Boolean(fotoAmpliada)} transparent animationType="fade" onRequestClose={() => setFotoAmpliada(null)}>
@@ -2520,6 +2556,14 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   salvarRelatorioTexto: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  osFinalizadaAviso: {
+    fontSize: 13,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    marginTop: 12,
+    marginBottom: 8,
+    paddingHorizontal: 8,
+  },
   checkinSection: {
     backgroundColor: '#fafafa',
     borderWidth: 1,

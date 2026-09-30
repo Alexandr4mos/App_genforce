@@ -74,6 +74,7 @@ export default function AssinaturaCampo({ titulo, assinatura, onSalvar, onExclui
   }
 
   function iniciarTraco(x, y) {
+    if (desabilitado) return;
     desenhandoRef.current = true;
     const atual = [...pathsRef.current, [{ x, y }]];
     pathsRef.current = atual;
