@@ -125,6 +125,8 @@ export default function OSDetail({ osId, userId, onBack }) {
   const [mostrarCorrecao, setMostrarCorrecao] = useState(false);
   const [textoCorrecao, setTextoCorrecao] = useState('');
   const [processandoRevisao, setProcessandoRevisao] = useState(false);
+  const [finalizando, setFinalizando] = useState(false);
+  const finalizandoRef = useRef(false);
   const [gruposOpcionais, setGruposOpcionais] = useState(new Set());
 
   const debounceTimers = useRef({});
@@ -1288,36 +1290,45 @@ export default function OSDetail({ osId, userId, onBack }) {
   }
 
   async function finalizarOS() {
+    if (finalizandoRef.current) return;
+    finalizandoRef.current = true;
+    setFinalizando(true);
     setProcessandoRevisao(true);
-    const { error } = await supabase
-      .from('ordens_servico')
-      .update({
+
+    try {
+      const { error } = await supabase
+        .from('ordens_servico')
+        .update({
+          status: 'finalizado',
+          aprovado_supervisor: true,
+          aprovado_por: userId,
+          aprovado_em: new Date().toISOString(),
+        })
+        .eq('id', osId);
+
+      if (error) {
+        avisar(error.message, 'Erro ao finalizar');
+        return;
+      }
+
+      setOsInfo((prev) => ({
+        ...prev,
         status: 'finalizado',
         aprovado_supervisor: true,
         aprovado_por: userId,
         aprovado_em: new Date().toISOString(),
-      })
-      .eq('id', osId);
-    setProcessandoRevisao(false);
+      }));
 
-    if (error) {
-      avisar(error.message, 'Erro ao finalizar');
-      return;
+      await abrirRelatorioParaImpressao(osId);
+      avisar(
+        'OS finalizada. Use Imprimir / Salvar PDF na janela aberta. Envio automático por e-mail será configurado depois.',
+        'Finalizada'
+      );
+    } finally {
+      finalizandoRef.current = false;
+      setFinalizando(false);
+      setProcessandoRevisao(false);
     }
-
-    setOsInfo((prev) => ({
-      ...prev,
-      status: 'finalizado',
-      aprovado_supervisor: true,
-      aprovado_por: userId,
-      aprovado_em: new Date().toISOString(),
-    }));
-
-    await abrirRelatorioParaImpressao(osId);
-    avisar(
-      'OS finalizada. Use Imprimir / Salvar PDF na janela aberta. Envio automático por e-mail será configurado depois.',
-      'Finalizada'
-    );
   }
 
   async function solicitarCorrecao() {
@@ -1685,18 +1696,23 @@ export default function OSDetail({ osId, userId, onBack }) {
           <Text style={[styles.revisaoTitulo, { color: cores.texto }]}>Revisão do supervisor</Text>
           <View style={styles.revisaoBotoes}>
             <TouchableOpacity
-              style={[styles.revisaoBotao, { backgroundColor: '#1565c0' }]}
+              style={[
+                styles.revisaoBotao,
+                { backgroundColor: '#1565c0', opacity: finalizando || processandoRevisao ? 0.7 : 1 },
+              ]}
               onPress={finalizarOS}
-              disabled={processandoRevisao}
+              disabled={finalizando || processandoRevisao}
             >
-              <Text style={styles.revisaoBotaoTexto}>
-                {processandoRevisao ? '...' : 'Finalizar e gerar PDF'}
-              </Text>
+              {finalizando ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.revisaoBotaoTexto}>Finalizar e gerar PDF</Text>
+              )}
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.revisaoBotao, { backgroundColor: '#ff9800' }]}
               onPress={() => setMostrarCorrecao(true)}
-              disabled={processandoRevisao}
+              disabled={finalizando || processandoRevisao}
             >
               <Text style={styles.revisaoBotaoTexto}>Solicitar correção</Text>
             </TouchableOpacity>
