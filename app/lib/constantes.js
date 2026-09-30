@@ -81,8 +81,17 @@ export function pesoPrioridade(prioridade) {
 export const STATUS_OS_ABERTAS = ['agendado', 'pendente', 'andamento', 'pausada'];
 
 /**
- * Status exibido/filtrado no app — calculado a partir do fluxo (check-in/out,
- * finalização) e da data prevista vs. hoje. Não depende só do valor gravado no banco.
+ * Status exibido/filtrado no app.
+ *
+ * Regras (em ordem):
+ * 1. finalizado / concluida (banco ou checkout) — sempre respeitados
+ * 2. pausada gravada no banco (pausa manual via Editar OS) — respeitada
+ * 3. com check-in: se data prevista já passou → pausada (automático); senão → andamento
+ * 4. sem check-in: data futura → agendado; caso contrário → pendente
+ *
+ * Não há trigger/cron no Supabase para isso — só esta função no client.
+ * Por isso salvar status="pausada" e depois filtrar/exibir pelo valor bruto do banco
+ * "parece" não persistir: as listas usam statusEfetivo, que antes ignorava pausada manual.
  */
 export function statusEfetivo(os) {
   if (!os) return 'pendente';
@@ -90,10 +99,14 @@ export function statusEfetivo(os) {
   if (os.status === 'finalizado') return 'finalizado';
   if (os.checkout_em || os.status === 'concluida') return 'concluida';
 
+  // Pausa manual (Editar OS → Status → Pausada) deve aparecer após refetch.
+  if (os.status === 'pausada') return 'pausada';
+
   const hoje = hojeNoTimezone();
   const dataPrevista = parsearDataOs(os.data_inicio_prevista);
 
   if (os.checkin_em) {
+    // Pausa automática: OS em andamento cuja data prevista já passou.
     if (dataPrevista && dataPrevista.getTime() < hoje.getTime()) {
       return 'pausada';
     }
