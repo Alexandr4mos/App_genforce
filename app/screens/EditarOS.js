@@ -14,6 +14,7 @@ import { supabase } from '../lib/supabase';
 import { TIPOS_OS, STATUS_OS, PRIORIDADES_OS, TEMPLATE_PADRAO_ID } from '../lib/constantes';
 import { useTema } from '../lib/tema';
 import { avisar, confirmarAcao } from '../lib/avisos';
+import DatePickerCampo from '../components/DatePickerCampo';
 import {
   aplicarMudancaTipos,
   gruposOpcionaisIniciais,
@@ -99,10 +100,7 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
     setPrioridade(os.prioridade || 'medio');
     setDescricao(os.descricao || '');
     setUnidadeId(os.unidade_id);
-    if (os.data_inicio_prevista) {
-      const [ano, mes, dia] = os.data_inicio_prevista.split('-');
-      setDataPrevista(`${dia}/${mes}/${ano}`);
-    }
+    setDataPrevista(os.data_inicio_prevista ? String(os.data_inicio_prevista).slice(0, 10) : '');
 
     const { data: tiposAtuais } = await supabase.from('os_tipos').select('tipo').eq('os_id', osId);
     const mapaTipos = {};
@@ -260,14 +258,7 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
 
     setSalvando(true);
 
-    let dataConvertida = null;
-    if (dataPrevista.trim()) {
-      const partes = dataPrevista.trim().split('/');
-      if (partes.length === 3) {
-        const [dia, mes, ano] = partes;
-        dataConvertida = `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
-      }
-    }
+    const dataConvertida = dataPrevista.trim() || null;
 
     const { error } = await supabase
       .from('ordens_servico')
@@ -467,12 +458,10 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
       </View>
 
       <Text style={[styles.label, { color: cores.texto }]}>Data prevista da manutenção</Text>
-      <TextInput
-        style={[styles.input, { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard }]}
-        placeholder="DD/MM/AAAA"
-        placeholderTextColor={cores.placeholder}
+      <DatePickerCampo
         value={dataPrevista}
-        onChangeText={setDataPrevista}
+        onChange={setDataPrevista}
+        placeholder="Escolher data"
       />
 
       <Text style={[styles.label, { color: cores.texto }]}>Descrição</Text>
