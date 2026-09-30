@@ -15,13 +15,12 @@ export function ehPrivilegiado(papel) {
 
 export const PAPEIS_USUARIO = [
   { valor: 'tecnico', rotulo: 'Técnico' },
-  { valor: 'admin', rotulo: 'Admin / supervisor' },
+  { valor: 'supervisor', rotulo: 'Supervisor' },
+  { valor: 'admin', rotulo: 'Admin' },
 ];
 
 export function rotuloPapel(papel) {
-  if (papel === 'admin' || papel === 'supervisor') return 'Admin / supervisor';
-  if (papel === 'tecnico') return 'Técnico';
-  return papel || '—';
+  return PAPEIS_USUARIO.find((p) => p.valor === papel)?.rotulo || papel || '—';
 }
 
 /** Normaliza login digitado no cadastro (sem @): minúsculas, sem acentos, só [a-z0-9._-]. */

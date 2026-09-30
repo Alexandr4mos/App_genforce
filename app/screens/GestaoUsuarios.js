@@ -26,6 +26,8 @@ export default function GestaoUsuarios({ onBack, userId }) {
   const [erroForm, setErroForm] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [atualizandoId, setAtualizandoId] = useState(null);
+  const [usuarioPapelEditando, setUsuarioPapelEditando] = useState(null);
+  const [papelSelecionado, setPapelSelecionado] = useState('tecnico');
 
   useEffect(() => {
     carregarUsuarios();
@@ -135,18 +137,34 @@ export default function GestaoUsuarios({ onBack, userId }) {
     avisar('Conta criada com sucesso.', 'Usuário criado');
   }
 
-  async function alternarPapel(u) {
-    const novoPapel = u.papel === 'tecnico' ? 'admin' : 'tecnico';
-    const rotuloNovo = rotuloPapel(novoPapel);
+  function abrirAlterarPapel(u) {
+    setUsuarioPapelEditando(u);
+    setPapelSelecionado(u.papel || 'tecnico');
+  }
+
+  function fecharAlterarPapel() {
+    setUsuarioPapelEditando(null);
+    setPapelSelecionado('tecnico');
+  }
+
+  async function salvarPapel() {
+    const u = usuarioPapelEditando;
+    if (!u) return;
+
+    if (papelSelecionado === u.papel) {
+      fecharAlterarPapel();
+      return;
+    }
+
     const confirmado = await confirmarAcao(
-      `Alterar ${u.nome} para ${rotuloNovo}?`
+      `Alterar o papel de ${u.nome} de "${rotuloPapel(u.papel)}" para "${rotuloPapel(papelSelecionado)}"?`
     );
     if (!confirmado) return;
 
     setAtualizandoId(u.id);
     const { error } = await supabase
       .from('usuarios')
-      .update({ papel: novoPapel })
+      .update({ papel: papelSelecionado })
       .eq('id', u.id);
     setAtualizandoId(null);
 
@@ -156,8 +174,10 @@ export default function GestaoUsuarios({ onBack, userId }) {
     }
 
     setUsuarios((prev) =>
-      prev.map((item) => (item.id === u.id ? { ...item, papel: novoPapel } : item))
+      prev.map((item) => (item.id === u.id ? { ...item, papel: papelSelecionado } : item))
     );
+    fecharAlterarPapel();
+    avisar(`Papel atualizado para ${rotuloPapel(papelSelecionado)}.`, 'Atualizado');
   }
 
   async function alternarAtivo(u) {
@@ -227,10 +247,15 @@ export default function GestaoUsuarios({ onBack, userId }) {
               ]}
             >
               <View style={styles.cardHeader}>
-                <Text style={[styles.cardNome, { color: cores.texto }]}>
-                  {u.nome}
-                  {ehEu ? ' (você)' : ''}
-                </Text>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={[styles.cardNome, { color: cores.texto }]}>
+                    {u.nome}
+                    {ehEu ? ' (você)' : ''}
+                  </Text>
+                  <Text style={[styles.cardPapel, { color: cores.textoSecundario }]}>
+                    Papel atual: {rotuloPapel(u.papel)}
+                  </Text>
+                </View>
                 <View
                   style={[
                     styles.statusBadge,
@@ -244,7 +269,7 @@ export default function GestaoUsuarios({ onBack, userId }) {
               <View style={styles.acoesRow}>
                 <TouchableOpacity
                   style={[styles.acaoBtn, { borderColor: cores.borda }]}
-                  onPress={() => alternarPapel(u)}
+                  onPress={() => abrirAlterarPapel(u)}
                   disabled={processando || ehEu}
                 >
                   <Text style={[styles.acaoBtnTexto, { color: cores.primario }]}>
@@ -369,6 +394,85 @@ export default function GestaoUsuarios({ onBack, userId }) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <Modal
+        visible={Boolean(usuarioPapelEditando)}
+        transparent
+        animationType="slide"
+        onRequestClose={fecharAlterarPapel}
+      >
+        <Pressable style={styles.modalOverlay} onPress={fecharAlterarPapel}>
+          <Pressable
+            style={[styles.modalSheet, { backgroundColor: cores.fundoCard }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={[styles.modalTitulo, { color: cores.texto }]}>Alterar papel</Text>
+            <Text style={[styles.modalSubtitulo, { color: cores.textoSecundario }]}>
+              {usuarioPapelEditando?.nome}
+            </Text>
+            <Text style={[styles.label, { color: cores.texto }]}>
+              Papel atual: {rotuloPapel(usuarioPapelEditando?.papel)}
+            </Text>
+
+            <Text style={[styles.label, { color: cores.texto }]}>Novo papel</Text>
+            <View style={styles.papelRow}>
+              {PAPEIS_USUARIO.map((p) => (
+                <TouchableOpacity
+                  key={p.valor}
+                  style={[
+                    styles.papelChip,
+                    { borderColor: cores.borda },
+                    papelSelecionado === p.valor && {
+                      backgroundColor: cores.primario,
+                      borderColor: cores.primario,
+                    },
+                  ]}
+                  onPress={() => setPapelSelecionado(p.valor)}
+                >
+                  <Text
+                    style={[
+                      styles.papelChipTexto,
+                      { color: papelSelecionado === p.valor ? '#fff' : cores.texto },
+                    ]}
+                  >
+                    {p.rotulo}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.modalBotoes}>
+              <TouchableOpacity style={styles.modalBtnSec} onPress={fecharAlterarPapel}>
+                <Text style={[styles.modalBtnSecTexto, { color: cores.textoSecundario }]}>
+                  Cancelar
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalBtnPri,
+                  {
+                    backgroundColor: cores.primario,
+                    opacity:
+                      atualizandoId === usuarioPapelEditando?.id ||
+                      papelSelecionado === usuarioPapelEditando?.papel
+                        ? 0.7
+                        : 1,
+                  },
+                ]}
+                onPress={salvarPapel}
+                disabled={
+                  atualizandoId === usuarioPapelEditando?.id ||
+                  papelSelecionado === usuarioPapelEditando?.papel
+                }
+              >
+                <Text style={styles.modalBtnPriTexto}>
+                  {atualizandoId === usuarioPapelEditando?.id ? 'Salvando...' : 'Salvar papel'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -400,7 +504,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 10,
   },
-  cardNome: { fontSize: 16, fontWeight: '700', flex: 1, marginRight: 8 },
+  cardNome: { fontSize: 16, fontWeight: '700' },
+  cardPapel: { fontSize: 13, marginTop: 4 },
   statusBadge: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
   statusBadgeTexto: { color: '#fff', fontSize: 11, fontWeight: '700' },
   acoesRow: { flexDirection: 'row', gap: 8 },
@@ -423,7 +528,8 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 32,
   },
-  modalTitulo: { fontSize: 18, fontWeight: '700', marginBottom: 12 },
+  modalTitulo: { fontSize: 18, fontWeight: '700', marginBottom: 4 },
+  modalSubtitulo: { fontSize: 14, marginBottom: 8 },
   label: { fontSize: 13, fontWeight: '600', marginTop: 8, marginBottom: 6 },
   input: {
     borderWidth: 1,
