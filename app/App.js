@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from './lib/supabase';
-import { emailAuthDeLogin, sairComRetry } from './lib/auth';
+import { emailAuthDeLogin, sairComRetry, ehPrivilegiado } from './lib/auth';
 import { TemaProvider, useTema } from './lib/tema';
 import { FiltroOSProvider, useFiltroOS } from './lib/filtroOS';
 import OSDetail from './screens/OSDetail';
@@ -16,12 +16,15 @@ import ImportarClientes from './screens/ImportarClientes';
 import Login from './screens/Login';
 import RemanejarOS from './screens/RemanejarOS';
 import GestaoUsuarios from './screens/GestaoUsuarios';
+import AppShell from './components/AppShell';
+import FeedbackHost from './components/ui/FeedbackHost';
 
 export default function App() {
   return (
     <TemaProvider>
       <FiltroOSProvider>
         <AppInterno />
+        <FeedbackHost />
       </FiltroOSProvider>
     </TemaProvider>
   );
@@ -38,12 +41,8 @@ function AppInterno() {
   const [osSelecionadaId, setOsSelecionadaId] = useState(null);
   const [criandoOS, setCriandoOS] = useState(false);
   const [osEditandoId, setOsEditandoId] = useState(null);
-  const [mostrandoListaDeOS, setMostrandoListaDeOS] = useState(false);
-  const [mostrandoListaDePecas, setMostrandoListaDePecas] = useState(false);
-  const [mostrandoDashboard, setMostrandoDashboard] = useState(false);
-  const [mostrandoEditarCliente, setMostrandoEditarCliente] = useState(false);
-  const [mostrandoImportar, setMostrandoImportar] = useState(false);
-  const [mostrandoGestaoUsuarios, setMostrandoGestaoUsuarios] = useState(false);
+  const [secao, setSecao] = useState('os');
+  const [papel, setPapel] = useState(null);
   const [osRemanejandoId, setOsRemanejandoId] = useState(null);
 
   useEffect(() => {
@@ -53,6 +52,19 @@ function AppInterno() {
     });
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!session?.user?.id) {
+      setPapel(null);
+      return;
+    }
+    supabase
+      .from('usuarios')
+      .select('papel')
+      .eq('id', session.user.id)
+      .single()
+      .then(({ data }) => setPapel(data?.papel || 'tecnico'));
+  }, [session?.user?.id]);
 
   async function handleLogin() {
     setLoading(true);
@@ -97,12 +109,7 @@ function AppInterno() {
   async function handleLogout() {
     await sairComRetry(supabase.auth);
     setOsSelecionadaId(null);
-    setMostrandoListaDeOS(false);
-    setMostrandoListaDePecas(false);
-    setMostrandoDashboard(false);
-    setMostrandoEditarCliente(false);
-    setMostrandoImportar(false);
-    setMostrandoGestaoUsuarios(false);
+    setSecao('os');
     resetFiltros();
   }
 
@@ -172,89 +179,59 @@ function AppInterno() {
     );
   }
 
-  if (mostrandoListaDeOS) {
-    return (
-      <>
-        <StatusBar style={modoEscuro ? 'light' : 'dark'} />
-        <ListaDeOS
-          userId={session.user.id}
-          onBack={() => setMostrandoListaDeOS(false)}
-          onAbrirOS={(id) => {
-            setMostrandoListaDeOS(false);
-            setOsSelecionadaId(id);
-          }}
-          onEditarOS={setOsEditandoId}
-          onRemanejar={setOsRemanejandoId}
-        />
-      </>
-    );
-  }
+  const privilegiado = ehPrivilegiado(papel);
+  const navegar = (id) => () => setSecao(id);
+  const itensNav = [
+    { id: 'os', rotulo: 'Ordens de Serviço', rotuloCurto: 'Ordens', icone: 'list', principal: true, onPress: navegar('os') },
+    { id: 'painel', rotulo: 'Painel', icone: 'chart', principal: true, onPress: navegar('painel') },
+    { id: 'relatorio', rotulo: 'Relatório de OS', rotuloCurto: 'Relatório', icone: 'file', principal: true, onPress: navegar('relatorio') },
+    { id: 'pecas', rotulo: 'Lista de peças', icone: 'package', onPress: navegar('pecas') },
+    { id: 'clientes', rotulo: 'Clientes', icone: 'building', onPress: navegar('clientes') },
+    { id: 'importar', rotulo: 'Importar clientes', icone: 'upload', onPress: navegar('importar') },
+    ...(privilegiado
+      ? [{ id: 'usuarios', rotulo: 'Gestão de usuários', icone: 'users', onPress: navegar('usuarios') }]
+      : []),
+  ];
 
-  if (mostrandoListaDePecas) {
-    return (
-      <>
-        <StatusBar style={modoEscuro ? 'light' : 'dark'} />
-        <ListaDePecas onBack={() => setMostrandoListaDePecas(false)} />
-      </>
+  let conteudo;
+  if (secao === 'relatorio') {
+    conteudo = (
+      <ListaDeOS
+        userId={session.user.id}
+        onBack={() => setSecao('os')}
+        onAbrirOS={setOsSelecionadaId}
+        onEditarOS={setOsEditandoId}
+        onRemanejar={setOsRemanejandoId}
+      />
     );
-  }
-
-  if (mostrandoDashboard) {
-    return (
-      <>
-        <StatusBar style={modoEscuro ? 'light' : 'dark'} />
-        <Dashboard onBack={() => setMostrandoDashboard(false)} />
-      </>
-    );
-  }
-
-  if (mostrandoEditarCliente) {
-    return (
-      <>
-        <StatusBar style={modoEscuro ? 'light' : 'dark'} />
-        <EditarCliente onBack={() => setMostrandoEditarCliente(false)} />
-      </>
-    );
-  }
-
-  if (mostrandoImportar) {
-    return (
-      <>
-        <StatusBar style={modoEscuro ? 'light' : 'dark'} />
-        <ImportarClientes onBack={() => setMostrandoImportar(false)} />
-      </>
-    );
-  }
-
-  if (mostrandoGestaoUsuarios) {
-    return (
-      <>
-        <StatusBar style={modoEscuro ? 'light' : 'dark'} />
-        <GestaoUsuarios
-          userId={session.user.id}
-          onBack={() => setMostrandoGestaoUsuarios(false)}
-        />
-      </>
-    );
-  }
-
-  return (
-    <>
-      <StatusBar style={modoEscuro ? 'light' : 'dark'} />
+  } else if (secao === 'pecas') {
+    conteudo = <ListaDePecas onBack={() => setSecao('os')} />;
+  } else if (secao === 'painel') {
+    conteudo = <Dashboard onBack={() => setSecao('os')} />;
+  } else if (secao === 'clientes') {
+    conteudo = <EditarCliente onBack={() => setSecao('os')} />;
+  } else if (secao === 'importar') {
+    conteudo = <ImportarClientes onBack={() => setSecao('os')} />;
+  } else if (secao === 'usuarios' && privilegiado) {
+    conteudo = <GestaoUsuarios userId={session.user.id} onBack={() => setSecao('os')} />;
+  } else {
+    conteudo = (
       <ListaOS
         userId={session.user.id}
         onAbrirOS={setOsSelecionadaId}
         onCriarOS={() => setCriandoOS(true)}
         onEditarOS={setOsEditandoId}
         onRemanejar={setOsRemanejandoId}
-        onListaDeOS={() => setMostrandoListaDeOS(true)}
-        onListaDePecas={() => setMostrandoListaDePecas(true)}
-        onDashboard={() => setMostrandoDashboard(true)}
-        onEditarCliente={() => setMostrandoEditarCliente(true)}
-        onImportarClientes={() => setMostrandoImportar(true)}
-        onGestaoUsuarios={() => setMostrandoGestaoUsuarios(true)}
-        onSair={handleLogout}
       />
+    );
+  }
+
+  return (
+    <>
+      <StatusBar style={modoEscuro ? 'light' : 'dark'} />
+      <AppShell itens={itensNav} secaoAtiva={secao} onSair={handleLogout}>
+        {conteudo}
+      </AppShell>
     </>
   );
 }

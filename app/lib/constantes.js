@@ -35,20 +35,43 @@ export function rotuloStatus(valor) {
   return STATUS_OS.find((s) => s.valor === valor)?.rotulo || valor;
 }
 
-// Cor por status — usada na borda dos cards da lista de OS.
-// Cobertura completa dos status vem no item 9 (lista de OS), aqui é só
-// a base pra já não ficar sem cor quando "agendado" aparecer.
+// Cor sólida por status (faixa lateral, pontos de legenda, calendário).
 export const COR_STATUS = {
-  agendado: '#2196f3', // azul
-  pendente: '#e53935', // vermelho
-  andamento: '#ffb300', // amarelo
-  pausada: '#0d47a1', // azul escuro (tom forte)
-  concluida: '#4caf50', // verde
-  finalizado: '#9e9e9e', // cinza
+  agendado: '#3B82F6', // azul
+  pendente: '#EF4444', // vermelho
+  andamento: '#F59E0B', // âmbar
+  pausada: '#A855F7', // roxo
+  concluida: '#22C55E', // verde
+  finalizado: '#94A3B8', // cinza-azulado
 };
 
 export function corDoStatus(status) {
-  return COR_STATUS[status] || '#9e9e9e';
+  return COR_STATUS[status] || COR_STATUS.finalizado;
+}
+
+// Par texto/fundo suave para badges (contraste AA sobre o fundo).
+const STATUS_BADGE = {
+  claro: {
+    agendado: { fg: '#1D4ED8', bg: '#DBEAFE' },
+    pendente: { fg: '#B91C1C', bg: '#FEE2E2' },
+    andamento: { fg: '#92400E', bg: '#FEF3C7' },
+    pausada: { fg: '#7E22CE', bg: '#F3E8FF' },
+    concluida: { fg: '#15803D', bg: '#DCFCE7' },
+    finalizado: { fg: '#475569', bg: '#E2E8F0' },
+  },
+  escuro: {
+    agendado: { fg: '#93C5FD', bg: '#16294A' },
+    pendente: { fg: '#FCA5A5', bg: '#3B1616' },
+    andamento: { fg: '#FCD34D', bg: '#3A2A0B' },
+    pausada: { fg: '#D8B4FE', bg: '#2E1A47' },
+    concluida: { fg: '#86EFAC', bg: '#14301F' },
+    finalizado: { fg: '#CBD5E1', bg: '#26324A' },
+  },
+};
+
+export function estiloBadgeStatus(status, modoEscuro = false) {
+  const tema = modoEscuro ? STATUS_BADGE.escuro : STATUS_BADGE.claro;
+  return tema[status] || tema.finalizado;
 }
 
 export const PRIORIDADES_OS = [
@@ -58,9 +81,9 @@ export const PRIORIDADES_OS = [
 ];
 
 export const COR_PRIORIDADE = {
-  alto: '#e53935',
-  medio: '#ffb300',
-  baixo: '#4caf50',
+  alto: '#EF4444',
+  medio: '#F59E0B',
+  baixo: '#22C55E',
 };
 
 export function rotuloPrioridade(valor) {

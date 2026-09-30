@@ -1,21 +1,40 @@
-import { Alert, Platform } from 'react-native';
+// Feedback ao usuário. A API (avisar / confirmarAcao) é a mesma de antes, mas agora
+// renderiza toast e modal de confirmação próprios (components/ui/FeedbackHost.js)
+// no lugar de window.alert/confirm.
+
+let ouvinte = null;
+
+export function registrarOuvinteFeedback(fn) {
+  ouvinte = fn;
+  return () => {
+    if (ouvinte === fn) ouvinte = null;
+  };
+}
+
+function ehErro(mensagem, titulo) {
+  return /erro|não foi possível|falha|sem permissão|inválid/i.test(`${titulo} ${mensagem}`);
+}
 
 export function avisar(mensagem, titulo = 'Aviso') {
-  if (Platform.OS === 'web') {
-    window.alert(mensagem);
-  } else {
-    Alert.alert(titulo, mensagem);
+  if (ouvinte) {
+    ouvinte({
+      tipo: 'toast',
+      mensagem: String(mensagem ?? ''),
+      titulo,
+      variante: ehErro(mensagem, titulo) ? 'erro' : 'info',
+    });
+    return;
   }
+  // Fallback antes do host montar (não deve acontecer em uso normal).
+  console.warn(`[${titulo}] ${mensagem}`);
 }
 
 export function confirmarAcao(mensagem) {
-  if (Platform.OS === 'web') {
-    return Promise.resolve(window.confirm(mensagem));
-  }
   return new Promise((resolve) => {
-    Alert.alert('Confirmar', mensagem, [
-      { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
-      { text: 'Confirmar', style: 'destructive', onPress: () => resolve(true) },
-    ]);
+    if (!ouvinte) {
+      resolve(false);
+      return;
+    }
+    ouvinte({ tipo: 'confirmar', mensagem: String(mensagem ?? ''), resolver: resolve });
   });
 }

@@ -4,19 +4,22 @@ import {
   Text,
   TextInput,
   FlatList,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
-  ActivityIndicator,
-  Button,
+  useWindowDimensions,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { avisar, confirmarAcao } from '../lib/avisos';
-import { STATUS_OS, rotuloTipo, rotuloStatus, corDoStatus, statusEfetivo } from '../lib/constantes';
+import { STATUS_OS, rotuloTipo, rotuloStatus, corDoStatus, estiloBadgeStatus, statusEfetivo } from '../lib/constantes';
 import { ehPrivilegiado } from '../lib/auth';
-import { useTema } from '../lib/tema';
+import { useTema, RAIO, SOMBRA, ALVO_TOQUE, LARGURA_DESKTOP } from '../lib/tema';
 import { useFiltroOS } from '../lib/filtroOS';
 import DateRangeFilter from '../components/DateRangeFilter';
-import MenuLateral from '../components/MenuLateral';
+import Botao from '../components/ui/Botao';
+import Icone from '../components/ui/Icone';
+import { BadgeStatus } from '../components/ui/Badge';
+import { SkeletonListaOS } from '../components/ui/Skeleton';
+import EstadoVazio from '../components/ui/EstadoVazio';
 import { formatarJanelaPrevista, limitesConsulta } from '../lib/dateRangeService';
 
 const OPCOES_ORDENACAO = [
@@ -33,17 +36,12 @@ export default function ListaOS({
   onCriarOS,
   onEditarOS,
   onRemanejar,
-  onListaDeOS,
-  onListaDePecas,
-  onDashboard,
-  onEditarCliente,
-  onImportarClientes,
-  onGestaoUsuarios,
-  onSair,
 }) {
-  const { cores, modoEscuro, alternarTema } = useTema();
+  const { cores, modoEscuro } = useTema();
+  const { width } = useWindowDimensions();
+  const desktop = width >= LARGURA_DESKTOP;
+  const colunas = width >= 1400 ? 2 : 1;
   const { dateFilter, setDateFilter, filtroStatus, setFiltroStatus } = useFiltroOS();
-  const [menuAberto, setMenuAberto] = useState(false);
   const [papel, setPapel] = useState(null);
   const [ordens, setOrdens] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -220,131 +218,145 @@ export default function ListaOS({
     const tipos = (item.os_tipos || []).map((t) => t.tipo);
     const equipamentos = chipsEquipamentos(item);
     const efetivo = statusEfetivo(item);
-    const agendado = efetivo === 'agendado';
     const cor = corDoStatus(efetivo);
+    const menuAberto = menuAbertoId === item.id;
 
     return (
-      <View style={[styles.card, { borderLeftColor: cor, backgroundColor: cores.fundoCard, borderColor: cores.borda }]}>
-        <View style={styles.cardHeaderRow}>
-          <TouchableOpacity style={{ flex: 1 }} onPress={() => onAbrirOS(item.id)}>
-            <View style={styles.numeroRow}>
-              <Text style={[styles.cardTitle, { color: cores.texto }]}>#{item.numero}</Text>
-              <View style={[styles.statusChip, { backgroundColor: cor }]}>
-                {agendado ? <Text style={styles.statusChipIcone}>📅 </Text> : null}
-                <Text style={styles.statusChipTexto}>{rotuloStatus(efetivo)}</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.menuBotao}
-            onPress={() => setMenuAbertoId(menuAbertoId === item.id ? null : item.id)}
-          >
-            <Text style={[styles.menuBotaoTexto, { color: cores.textoSecundario }]}>⋮</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity onPress={() => onAbrirOS(item.id)}>
-          {janela ? <Text style={[styles.cardJanela, { color: cores.textoSecundario }]}>{janela}</Text> : null}
-          <Text style={[styles.cardCliente, { color: cores.primario }]}>{item.clientes?.nome}</Text>
-          {item.clientes?.razao_social ? (
-            <Text style={[styles.cardRazao, { color: cores.textoSuave }]}>{item.clientes.razao_social}</Text>
-          ) : null}
-
-          {tipos.length > 0 ? (
-            <View style={styles.chipsRow}>
-              {tipos.map((tipo) => (
-                <View key={tipo} style={[styles.chipTipo, { backgroundColor: cores.chipTipoFundo }]}>
-                  <Text style={[styles.chipTipoTexto, { color: cores.primarioTexto }]}>{rotuloTipo(tipo)}</Text>
+      <View style={styles.cardWrap}>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: cores.fundoCard, borderColor: cores.borda, boxShadow: SOMBRA.sm },
+            menuAberto && { zIndex: 40 },
+          ]}
+        >
+          <View style={[styles.faixa, { backgroundColor: cor }]} />
+          <View style={styles.cardCorpo}>
+            <View style={styles.cardTopo}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Abrir OS ${item.numero}`}
+                style={styles.cardTopoTexto}
+                onPress={() => onAbrirOS(item.id)}
+              >
+                <View style={styles.numeroRow}>
+                  <Text style={[styles.numero, { color: cores.texto }]}>OS #{item.numero}</Text>
+                  <BadgeStatus status={efetivo} />
                 </View>
-              ))}
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Ações da OS ${item.numero}`}
+                style={({ hovered }) => [styles.menuBotao, hovered && { backgroundColor: cores.fundoSecundario }]}
+                onPress={() => setMenuAbertoId(menuAberto ? null : item.id)}
+              >
+                <Icone nome="more" tamanho={20} cor={cores.textoSecundario} />
+              </Pressable>
             </View>
-          ) : null}
 
-          {equipamentos.length > 0 ? (
-            <View style={styles.chipsRow}>
-              {equipamentos.map((rotulo, idx) => (
-                <View key={`${item.id}-eq-${idx}`} style={[styles.chipEquip, { backgroundColor: cores.chipEquipFundo }]}>
-                  <Text style={[styles.chipEquipTexto, { color: cores.texto }]}>{rotulo}</Text>
+            <Pressable accessibilityRole="button" onPress={() => onAbrirOS(item.id)}>
+              <Text style={[styles.cliente, { color: cores.texto }]} numberOfLines={2}>
+                {item.clientes?.nome}
+              </Text>
+              {item.clientes?.razao_social ? (
+                <Text style={[styles.razao, { color: cores.textoSuave }]} numberOfLines={1}>
+                  {item.clientes.razao_social}
+                </Text>
+              ) : null}
+
+              {janela ? (
+                <View style={styles.janelaRow}>
+                  <Icone nome="calendar" tamanho={15} cor={cores.textoSecundario} />
+                  <Text style={[styles.janela, { color: cores.textoSecundario }]}>{janela}</Text>
                 </View>
-              ))}
-            </View>
-          ) : null}
+              ) : null}
 
-          {item.descricao ? <Text style={[styles.cardDescricao, { color: cores.textoSecundario }]}>{item.descricao}</Text> : null}
-        </TouchableOpacity>
+              {tipos.length > 0 || equipamentos.length > 0 ? (
+                <View style={styles.chipsRow}>
+                  {tipos.map((tipo) => (
+                    <View key={tipo} style={[styles.chip, { backgroundColor: cores.chipTipoFundo }]}>
+                      <Text style={[styles.chipTexto, { color: cores.primarioTexto }]}>{rotuloTipo(tipo)}</Text>
+                    </View>
+                  ))}
+                  {equipamentos.map((rotulo, idx) => (
+                    <View key={`${item.id}-eq-${idx}`} style={[styles.chip, { backgroundColor: cores.chipEquipFundo }]}>
+                      <Text style={[styles.chipTexto, { color: cores.textoSecundario }]}>{rotulo}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
 
-        {menuAbertoId === item.id ? (
-          <View style={[styles.menuDropdown, { borderColor: cores.borda }]}>
-            <TouchableOpacity
-              style={styles.menuOpcao}
-              onPress={() => {
-                setMenuAbertoId(null);
-                onEditarOS(item.id);
-              }}
-            >
-              <Text style={[styles.menuOpcaoTexto, { color: cores.texto }]}>✎ Editar OS</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.menuOpcao}
-              onPress={() => {
-                setMenuAbertoId(null);
-                tentarRemanejar(item.id);
-              }}
-            >
-              <Text style={[styles.menuOpcaoTexto, { color: cores.texto }]}>📅 Remanejar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.menuOpcao}
-              onPress={() => {
-                setMenuAbertoId(null);
-                excluirOSDaLista(item.id);
-              }}
-            >
-              <Text style={[styles.menuOpcaoTexto, styles.menuOpcaoExcluirTexto]}>🗑 Excluir OS</Text>
-            </TouchableOpacity>
+              {item.descricao ? (
+                <Text style={[styles.descricao, { color: cores.textoSecundario }]} numberOfLines={2}>
+                  {item.descricao}
+                </Text>
+              ) : null}
+            </Pressable>
           </View>
-        ) : null}
+
+          {menuAberto ? (
+            <View style={[styles.menuDropdown, { backgroundColor: cores.fundoCard, borderColor: cores.borda, boxShadow: SOMBRA.md }]}>
+              <OpcaoMenu
+                icone="edit"
+                texto="Editar OS"
+                onPress={() => {
+                  setMenuAbertoId(null);
+                  onEditarOS(item.id);
+                }}
+              />
+              <OpcaoMenu
+                icone="calendar"
+                texto="Remanejar"
+                onPress={() => {
+                  setMenuAbertoId(null);
+                  tentarRemanejar(item.id);
+                }}
+              />
+              <OpcaoMenu
+                icone="trash"
+                texto="Excluir OS"
+                perigo
+                onPress={() => {
+                  setMenuAbertoId(null);
+                  excluirOSDaLista(item.id);
+                }}
+              />
+            </View>
+          ) : null}
+        </View>
       </View>
     );
   }
 
   const rotuloOrdenacao = OPCOES_ORDENACAO.find((o) => o.valor === ordenacao)?.rotulo || 'Ordenar';
-  const rotuloFiltroStatus = filtroStatus
-    ? rotuloStatus(filtroStatus)
-    : 'Status';
-
-  const itensMenu = [
-    { rotulo: 'Criar OS', onPress: tentarCriarOS },
-    { rotulo: 'Editar cliente', onPress: onEditarCliente },
-    {
-      rotulo: 'Relatório',
-      subitens: [
-        { rotulo: 'Lista de OS', onPress: onListaDeOS },
-        { rotulo: 'Lista de peças', onPress: onListaDePecas },
-      ],
-    },
-    { rotulo: 'Desempenho', onPress: onDashboard },
-    { rotulo: 'Importar clientes', onPress: onImportarClientes },
-    ...(privilegiado
-      ? [{ rotulo: 'Gestão de usuários', onPress: onGestaoUsuarios }]
-      : []),
-    { rotulo: 'Sair', onPress: onSair },
-  ];
+  const rotuloFiltroStatus = filtroStatus ? rotuloStatus(filtroStatus) : 'Todos os status';
 
   function renderCabecalho() {
     return (
-      <View>
+      <View style={{ zIndex: 50 }}>
         <View style={styles.tituloRow}>
-          <TouchableOpacity style={styles.hamburguer} onPress={() => setMenuAberto(true)}>
-            <Text style={[styles.hamburguerTexto, { color: cores.texto }]}>☰</Text>
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: cores.texto }]}>Ordens de Serviço</Text>
-          <TouchableOpacity
-            style={styles.atualizarBotao}
+          <View style={{ flex: 1 }}>
+            <Text accessibilityRole="header" style={[styles.title, { color: cores.texto }]}>
+              Ordens de Serviço
+            </Text>
+            <Text style={[styles.subtitulo, { color: cores.textoSecundario }]}>
+              {loading
+                ? 'Carregando…'
+                : `${ordensVisiveis.length} ${ordensVisiveis.length === 1 ? 'ordem' : 'ordens'} no período`}
+            </Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Atualizar lista"
+            style={({ hovered }) => [
+              styles.iconeBotao,
+              { borderColor: cores.borda, backgroundColor: hovered ? cores.fundoSecundario : cores.fundoCard },
+            ]}
             onPress={() => fetchOrdens(dateFilter.appliedRange)}
           >
-            <Text style={[styles.atualizarTexto, { color: cores.primario }]}>↻</Text>
-          </TouchableOpacity>
+            <Icone nome="refresh" tamanho={18} cor={cores.textoSecundario} />
+          </Pressable>
+          {desktop ? <Botao titulo="Nova OS" icone="plus" onPress={tentarCriarOS} /> : null}
         </View>
 
         <DateRangeFilter
@@ -354,322 +366,304 @@ export default function ListaOS({
         />
 
         <View style={styles.contadoresRow}>
-          {STATUS_OS.map((s) => (
-            <TouchableOpacity
-              key={s.valor}
-              style={[
-                styles.contadorChip,
-                { borderColor: corDoStatus(s.valor) },
-                filtroStatus === s.valor && { backgroundColor: corDoStatus(s.valor) },
-              ]}
-              onPress={() =>
-                setFiltroStatus((atual) => (atual === s.valor ? null : s.valor))
-              }
-            >
-              <Text
+          {STATUS_OS.map((s) => {
+            const ativo = filtroStatus === s.valor;
+            const { fg, bg } = estiloBadgeStatus(s.valor, modoEscuro);
+            return (
+              <Pressable
+                key={s.valor}
+                accessibilityRole="button"
+                accessibilityState={{ selected: ativo }}
+                accessibilityLabel={`Filtrar por ${s.rotulo}: ${contadores[s.valor] || 0}`}
                 style={[
-                  styles.contadorTexto,
-                  { color: filtroStatus === s.valor ? '#fff' : corDoStatus(s.valor) },
+                  styles.contadorChip,
+                  { backgroundColor: bg, borderColor: ativo ? fg : 'transparent' },
                 ]}
+                onPress={() => setFiltroStatus((atual) => (atual === s.valor ? null : s.valor))}
               >
-                {s.rotulo} {contadores[s.valor] || 0}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <View style={[styles.contadorPonto, { backgroundColor: corDoStatus(s.valor) }]} />
+                <Text style={[styles.contadorTexto, { color: fg }]}>{s.rotulo}</Text>
+                <Text style={[styles.contadorNumero, { color: fg }]}>{contadores[s.valor] || 0}</Text>
+              </Pressable>
+            );
+          })}
         </View>
 
-        {filtroStatus ? (
-          <TouchableOpacity
-            style={[styles.filtroAtivoBar, { backgroundColor: cores.primarioFundo }]}
-            onPress={() => setFiltroStatus(null)}
-          >
-            <Text style={[styles.filtroAtivoTexto, { color: cores.primarioTexto }]}>
-              Filtrando: {rotuloStatus(filtroStatus)} · toque para limpar
-            </Text>
-          </TouchableOpacity>
-        ) : null}
-
-        <TextInput
-          style={[
-            styles.busca,
-            { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard },
-          ]}
-          placeholder="Buscar cliente, número ou descrição..."
-          placeholderTextColor={cores.placeholder}
-          value={busca}
-          onChangeText={setBusca}
-        />
+        <View style={[styles.buscaWrap, { borderColor: cores.bordaInput, backgroundColor: cores.fundoCard }]}>
+          <Icone nome="search" tamanho={18} cor={cores.textoSuave} />
+          <TextInput
+            accessibilityLabel="Buscar OS"
+            style={[styles.busca, { color: cores.texto }]}
+            placeholder="Buscar cliente, número ou descrição…"
+            placeholderTextColor={cores.placeholder}
+            value={busca}
+            onChangeText={setBusca}
+          />
+          {busca ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Limpar busca" onPress={() => setBusca('')} style={styles.limpar}>
+              <Icone nome="x" tamanho={16} cor={cores.textoSuave} />
+            </Pressable>
+          ) : null}
+        </View>
 
         <View style={styles.filtrosRow}>
-          <View style={styles.filtroWrap}>
-            <TouchableOpacity
-              style={[styles.filtroBotao, { borderColor: cores.borda, backgroundColor: cores.fundoSecundario }]}
-              onPress={() => setDropdownAberto(dropdownAberto === 'ordenar' ? null : 'ordenar')}
-            >
-              <Text style={[styles.filtroBotaoTexto, { color: cores.texto }]} numberOfLines={1}>
-                {rotuloOrdenacao} ▾
-              </Text>
-            </TouchableOpacity>
-            {dropdownAberto === 'ordenar' ? (
-              <View style={[styles.dropdown, { backgroundColor: cores.fundoCard, borderColor: cores.borda }]}>
-                {OPCOES_ORDENACAO.map((opcao) => (
-                  <TouchableOpacity
-                    key={opcao.valor}
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      setOrdenacao(opcao.valor);
-                      setDropdownAberto(null);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.dropdownItemTexto,
-                        { color: cores.texto },
-                        ordenacao === opcao.valor && { color: cores.primario, fontWeight: '700' },
-                      ]}
-                    >
-                      {opcao.rotulo}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ) : null}
-          </View>
-
-          <View style={styles.filtroWrap}>
-            <TouchableOpacity
-              style={[styles.filtroBotao, { borderColor: cores.borda, backgroundColor: cores.fundoSecundario }]}
-              onPress={() => setDropdownAberto(dropdownAberto === 'status' ? null : 'status')}
-            >
-              <Text style={[styles.filtroBotaoTexto, { color: cores.texto }]} numberOfLines={1}>
-                {rotuloFiltroStatus} ▾
-              </Text>
-            </TouchableOpacity>
-            {dropdownAberto === 'status' ? (
-              <View style={[styles.dropdown, { backgroundColor: cores.fundoCard, borderColor: cores.borda }]}>
-                <TouchableOpacity
-                  style={styles.dropdownItem}
-                  onPress={() => {
-                    setFiltroStatus(null);
-                    setDropdownAberto(null);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.dropdownItemTexto,
-                      { color: cores.texto },
-                      !filtroStatus && { color: cores.primario, fontWeight: '700' },
-                    ]}
-                  >
-                    Todos
-                  </Text>
-                </TouchableOpacity>
-                {STATUS_OS.map((s) => (
-                  <TouchableOpacity
-                    key={s.valor}
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      setFiltroStatus(s.valor);
-                      setDropdownAberto(null);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.dropdownItemTexto,
-                        { color: cores.texto },
-                        filtroStatus === s.valor && { color: cores.primario, fontWeight: '700' },
-                      ]}
-                    >
-                      {s.rotulo}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ) : null}
-          </View>
+          <SeletorDropdown
+            rotulo={rotuloOrdenacao}
+            aberto={dropdownAberto === 'ordenar'}
+            onAlternar={() => setDropdownAberto(dropdownAberto === 'ordenar' ? null : 'ordenar')}
+            opcoes={OPCOES_ORDENACAO}
+            valor={ordenacao}
+            onEscolher={(v) => {
+              setOrdenacao(v);
+              setDropdownAberto(null);
+            }}
+          />
+          <SeletorDropdown
+            rotulo={rotuloFiltroStatus}
+            aberto={dropdownAberto === 'status'}
+            onAlternar={() => setDropdownAberto(dropdownAberto === 'status' ? null : 'status')}
+            opcoes={[{ valor: '', rotulo: 'Todos os status' }, ...STATUS_OS]}
+            valor={filtroStatus || ''}
+            onEscolher={(v) => {
+              setFiltroStatus(v || null);
+              setDropdownAberto(null);
+            }}
+          />
         </View>
 
-        {loading ? <ActivityIndicator style={{ marginVertical: 12 }} /> : null}
-        {errorMsg ? (
-          <View style={styles.erroBox}>
-            <Text style={[styles.error, { color: cores.erro }]}>{errorMsg}</Text>
-            <Button title="Tentar de novo" onPress={() => fetchOrdens(dateFilter.appliedRange)} />
-          </View>
-        ) : null}
+        {loading ? <SkeletonListaOS quantidade={3} /> : null}
       </View>
     );
   }
 
   return (
     <View style={[styles.container, { backgroundColor: cores.fundo }]}>
-      <MenuLateral
-        visivel={menuAberto}
-        onFechar={() => setMenuAberto(false)}
-        toggleTema={{ valor: modoEscuro, onAlternar: alternarTema }}
-        itens={itensMenu}
-      />
-
       <FlatList
+        key={`colunas-${colunas}`}
+        numColumns={colunas > 1 ? colunas : undefined}
+        columnWrapperStyle={colunas > 1 ? styles.colunasWrap : undefined}
         style={styles.lista}
-        contentContainerStyle={styles.listaConteudo}
-        data={ordensVisiveis}
+        contentContainerStyle={[styles.listaConteudo, desktop && styles.listaDesktop]}
+        data={loading ? [] : ordensVisiveis}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderCard}
         ListHeaderComponent={renderCabecalho}
-        stickyHeaderIndices={[]}
-        extraData={{ filtroStatus, busca, ordenacao, cores, dropdownAberto, contadores }}
+        extraData={{ filtroStatus, busca, ordenacao, cores, dropdownAberto, contadores, menuAbertoId, colunas }}
         onScrollBeginDrag={() => {
           setDropdownAberto(null);
           setMenuAbertoId(null);
         }}
         ListEmptyComponent={
-          loading ? null : (
-            <Text style={[styles.vazio, { color: cores.textoSuave }]}>
-              {errorMsg
-                ? ''
-                : filtroStatus
-                  ? `Nenhuma OS com status "${rotuloStatus(filtroStatus)}" neste período.`
-                  : 'Nenhum resultado encontrado neste período.'}
-            </Text>
+          loading ? null : errorMsg ? (
+            <EstadoVazio
+              tom="erro"
+              icone="alert"
+              titulo="Não foi possível carregar as ordens"
+              texto={`${errorMsg}. Verifique sua conexão e tente novamente.`}
+              acao="Tentar de novo"
+              onAcao={() => fetchOrdens(dateFilter.appliedRange)}
+            />
+          ) : (
+            <EstadoVazio
+              icone="inbox"
+              titulo={
+                filtroStatus
+                  ? `Nenhuma OS "${rotuloStatus(filtroStatus)}" neste período`
+                  : 'Nenhuma OS neste período'
+              }
+              texto="Ajuste o período ou os filtros para ver outras ordens de serviço."
+              acao={filtroStatus || busca ? 'Limpar filtros' : privilegiado ? 'Criar OS' : undefined}
+              onAcao={filtroStatus || busca ? () => { setFiltroStatus(null); setBusca(''); } : tentarCriarOS}
+            />
           )
         }
       />
+      {!desktop ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Nova OS"
+          onPress={tentarCriarOS}
+          style={[styles.fab, { backgroundColor: cores.primario, boxShadow: SOMBRA.lg }]}
+        >
+          <Icone nome="plus" tamanho={26} cor={cores.sobrePrimario} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function OpcaoMenu({ icone, texto, onPress, perigo }) {
+  const { cores } = useTema();
+  const cor = perigo ? cores.erro : cores.texto;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ hovered }) => [styles.menuOpcao, hovered && { backgroundColor: cores.fundoSecundario }]}
+    >
+      <Icone nome={icone} tamanho={17} cor={cor} />
+      <Text style={[styles.menuOpcaoTexto, { color: cor }]}>{texto}</Text>
+    </Pressable>
+  );
+}
+
+function SeletorDropdown({ rotulo, aberto, onAlternar, opcoes, valor, onEscolher }) {
+  const { cores } = useTema();
+  return (
+    <View style={styles.filtroWrap}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: aberto }}
+        style={[styles.filtroBotao, { borderColor: cores.bordaInput, backgroundColor: cores.fundoCard }]}
+        onPress={onAlternar}
+      >
+        <Text style={[styles.filtroBotaoTexto, { color: cores.texto }]} numberOfLines={1}>
+          {rotulo}
+        </Text>
+        <Icone nome="chevronDown" tamanho={16} cor={cores.textoSuave} />
+      </Pressable>
+      {aberto ? (
+        <View style={[styles.dropdown, { backgroundColor: cores.fundoCard, borderColor: cores.borda, boxShadow: SOMBRA.md }]}>
+          {opcoes.map((opcao) => {
+            const ativo = valor === opcao.valor;
+            return (
+              <Pressable
+                key={opcao.valor || 'todos'}
+                accessibilityRole="menuitem"
+                style={({ hovered }) => [styles.dropdownItem, hovered && { backgroundColor: cores.fundoSecundario }]}
+                onPress={() => onEscolher(opcao.valor)}
+              >
+                <Text style={{ flex: 1, fontSize: 14, color: ativo ? cores.primario : cores.texto, fontWeight: ativo ? '700' : '500' }}>
+                  {opcao.rotulo}
+                </Text>
+                {ativo ? <Icone nome="check" tamanho={16} cor={cores.primario} /> : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 60, backgroundColor: '#fff' },
+  container: { flex: 1 },
   lista: { flex: 1 },
-  listaConteudo: { paddingHorizontal: 16, paddingBottom: 40 },
-  tituloRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  hamburguer: { paddingRight: 10, paddingVertical: 4 },
-  hamburguerTexto: { fontSize: 26, fontWeight: 'bold' },
-  title: { fontSize: 20, fontWeight: 'bold', flex: 1 },
-  atualizarBotao: { paddingHorizontal: 10, paddingVertical: 4 },
-  atualizarTexto: { fontSize: 22, color: '#007AFF' },
-  contadoresRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 },
-  contadorChip: {
-    borderWidth: 1.5,
-    borderRadius: 16,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    marginRight: 6,
-    marginBottom: 6,
-  },
-  contadorTexto: { fontSize: 12, fontWeight: '700' },
-  filtroAtivoBar: {
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginBottom: 8,
-  },
-  filtroAtivoTexto: { fontSize: 13, fontWeight: '600' },
-  busca: {
+  listaConteudo: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 96 },
+  listaDesktop: { paddingHorizontal: 32, paddingTop: 32, width: '100%', maxWidth: 1240, alignSelf: 'center' },
+  tituloRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  title: { fontSize: 24, fontWeight: '700', letterSpacing: -0.3 },
+  subtitulo: { fontSize: 14, marginTop: 2 },
+  iconeBotao: {
+    width: ALVO_TOQUE,
+    height: ALVO_TOQUE,
+    borderRadius: RAIO.md,
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 8,
-  },
-  filtrosRow: { flexDirection: 'row', zIndex: 20, marginBottom: 8 },
-  filtroWrap: { flex: 1, marginRight: 8 },
-  filtroBotao: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    backgroundColor: '#fafafa',
-  },
-  filtroBotaoTexto: { fontSize: 13, color: '#333' },
-  dropdown: {
-    position: 'absolute',
-    top: 44,
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#eee',
-    borderRadius: 10,
-    zIndex: 30,
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  dropdownItem: { paddingVertical: 10, paddingHorizontal: 12 },
-  dropdownItemTexto: { color: '#333' },
-  dropdownItemAtivo: { color: '#007AFF', fontWeight: '700' },
-  novaOsBotao: {
-    backgroundColor: '#007AFF',
-    borderRadius: 10,
-    paddingVertical: 12,
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'center',
   },
-  novaOsBotaoTexto: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  error: { color: 'red', marginBottom: 8 },
-  erroBox: { marginBottom: 8 },
-  vazio: { color: '#888', textAlign: 'center', marginTop: 24, fontSize: 14 },
-  card: {
-    borderWidth: 1,
-    borderColor: '#eee',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
-    borderLeftWidth: 6,
-    backgroundColor: '#fff',
-    overflow: 'hidden',
-  },
-  cardHeaderRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  numeroRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 },
-  cardTitle: { fontWeight: 'bold', fontSize: 16, marginRight: 8, marginBottom: 4 },
-  statusChip: {
+  contadoresRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 12 },
+  contadorChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    marginBottom: 4,
+    gap: 6,
+    borderWidth: 1.5,
+    borderRadius: RAIO.pill,
+    minHeight: 36,
+    paddingHorizontal: 12,
   },
-  statusChipIcone: { color: '#fff', fontSize: 11 },
-  statusChipTexto: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  cardJanela: { fontSize: 13, color: '#444', fontWeight: '600', marginBottom: 6 },
-  cardCliente: { fontWeight: '700', color: '#007AFF', fontSize: 15 },
-  cardRazao: { fontSize: 12, color: '#777', marginBottom: 6 },
-  cardDescricao: { fontSize: 13, color: '#444', marginTop: 4 },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 },
-  chipTipo: {
-    backgroundColor: '#eef5ff',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginRight: 6,
-    marginBottom: 4,
-  },
-  chipTipoTexto: { fontSize: 11, color: '#0b5ed7', fontWeight: '700' },
-  chipEquip: {
-    backgroundColor: '#f3f3f3',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginRight: 6,
-    marginBottom: 4,
-  },
-  chipEquipTexto: { fontSize: 11, color: '#333', fontWeight: '600' },
-  menuBotao: { paddingHorizontal: 10, paddingVertical: 4 },
-  menuBotaoTexto: { fontSize: 20, color: '#666', fontWeight: 'bold' },
-  menuDropdown: {
-    marginTop: 8,
+  contadorPonto: { width: 7, height: 7, borderRadius: 4 },
+  contadorTexto: { fontSize: 13, fontWeight: '600' },
+  contadorNumero: { fontSize: 13, fontWeight: '700' },
+  buscaWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     borderWidth: 1,
-    borderColor: '#eee',
-    borderRadius: 8,
-    overflow: 'hidden',
+    borderRadius: RAIO.md,
+    paddingHorizontal: 14,
+    minHeight: ALVO_TOQUE,
+    marginBottom: 10,
   },
-  menuOpcao: { paddingVertical: 10, paddingHorizontal: 12, borderTopWidth: 1, borderTopColor: '#f2f2f2' },
-  menuOpcaoTexto: { color: '#333' },
-  menuOpcaoExcluirTexto: { color: '#e53935' },
+  busca: { flex: 1, fontSize: 15, paddingVertical: 10, outlineStyle: 'none' },
+  limpar: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  filtrosRow: { flexDirection: 'row', gap: 10, zIndex: 60, marginBottom: 16 },
+  filtroWrap: { flex: 1 },
+  filtroBotao: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: RAIO.md,
+    minHeight: ALVO_TOQUE,
+    paddingHorizontal: 14,
+  },
+  filtroBotaoTexto: { fontSize: 14, fontWeight: '500', flex: 1 },
+  dropdown: {
+    position: 'absolute',
+    top: ALVO_TOQUE + 6,
+    left: 0,
+    right: 0,
+    borderWidth: 1,
+    borderRadius: RAIO.md,
+    paddingVertical: 4,
+    zIndex: 70,
+  },
+  dropdownItem: { flexDirection: 'row', alignItems: 'center', minHeight: 40, paddingHorizontal: 14 },
+  cardWrap: { flex: 1, minWidth: 0 },
+  colunasWrap: { gap: 12 },
+  card: {
+    borderWidth: 1,
+    borderRadius: RAIO.lg,
+    marginBottom: 12,
+    marginHorizontal: 0,
+    flexDirection: 'row',
+    overflow: 'visible',
+  },
+  faixa: { width: 5, borderTopLeftRadius: RAIO.lg, borderBottomLeftRadius: RAIO.lg },
+  cardCorpo: { flex: 1, padding: 16, minWidth: 0 },
+  cardTopo: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  cardTopoTexto: { flex: 1 },
+  numeroRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10 },
+  numero: { fontSize: 14, fontWeight: '700' },
+  menuBotao: {
+    width: ALVO_TOQUE,
+    height: ALVO_TOQUE,
+    marginRight: -10,
+    marginTop: -10,
+    borderRadius: RAIO.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cliente: { fontSize: 17, fontWeight: '700', letterSpacing: -0.2 },
+  razao: { fontSize: 13, marginTop: 2 },
+  janelaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
+  janela: { fontSize: 13, fontWeight: '500' },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
+  chip: { borderRadius: RAIO.pill, paddingHorizontal: 10, paddingVertical: 4 },
+  chipTexto: { fontSize: 12, fontWeight: '600' },
+  descricao: { fontSize: 13, lineHeight: 19, marginTop: 12 },
+  menuDropdown: {
+    position: 'absolute',
+    top: 44,
+    right: 12,
+    minWidth: 180,
+    borderWidth: 1,
+    borderRadius: RAIO.md,
+    paddingVertical: 4,
+    zIndex: 80,
+  },
+  menuOpcao: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, paddingHorizontal: 14 },
+  menuOpcaoTexto: { fontSize: 14, fontWeight: '500' },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
