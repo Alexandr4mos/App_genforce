@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from './lib/supabase';
-import { emailAuthDeLogin } from './lib/auth';
+import { emailAuthDeLogin, sairComRetry } from './lib/auth';
 import { TemaProvider, useTema } from './lib/tema';
 import { FiltroOSProvider, useFiltroOS } from './lib/filtroOS';
 import OSDetail from './screens/OSDetail';
@@ -78,14 +78,14 @@ function AppInterno() {
       .maybeSingle();
 
     if (perfilError) {
-      await supabase.auth.signOut();
+      await sairComRetry(supabase.auth);
       setErrorMsg('Não foi possível verificar sua conta. Tente novamente.');
       setLoading(false);
       return;
     }
 
     if (perfil && perfil.ativo === false) {
-      await supabase.auth.signOut();
+      await sairComRetry(supabase.auth);
       setErrorMsg('Esta conta está desativada. Entre em contato com um administrador.');
       setLoading(false);
       return;
@@ -95,7 +95,7 @@ function AppInterno() {
   }
 
   async function handleLogout() {
-    await supabase.auth.signOut();
+    await sairComRetry(supabase.auth);
     setOsSelecionadaId(null);
     setMostrandoListaDeOS(false);
     setMostrandoListaDePecas(false);

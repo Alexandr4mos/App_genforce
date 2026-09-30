@@ -349,6 +349,7 @@ export default function OSDetail({ osId, userId, onBack }) {
           .from('pendencias')
           .select('*')
           .eq('equipamento_id', eq.equipamento_id)
+          .neq('status', 'resolvida')
           .order('solicitado_em', { ascending: false });
         pendenciasIniciais[eq.equipamento_id] = pendencias || [];
       })
@@ -949,9 +950,7 @@ export default function OSDetail({ osId, userId, onBack }) {
 
     setPendenciasPorEquipamento((prev) => ({
       ...prev,
-      [equipamentoId]: (prev[equipamentoId] || []).map((p) =>
-        p.id === pendenciaId ? atualizada : p
-      ),
+      [equipamentoId]: (prev[equipamentoId] || []).filter((p) => p.id !== pendenciaId),
     }));
     setBaixaTexto((prev) => ({ ...prev, [pendenciaId]: '' }));
 
