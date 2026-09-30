@@ -207,7 +207,7 @@ function AppInterno() {
   } else if (secao === 'pecas') {
     conteudo = <ListaDePecas onBack={() => setSecao('os')} />;
   } else if (secao === 'painel') {
-    conteudo = <Dashboard onBack={() => setSecao('os')} />;
+    conteudo = <Dashboard onAbrirOS={setOsSelecionadaId} />;
   } else if (secao === 'clientes') {
     conteudo = <EditarCliente onBack={() => setSecao('os')} />;
   } else if (secao === 'importar') {
