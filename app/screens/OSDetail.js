@@ -28,6 +28,9 @@ import SecaoColapsavel from '../components/SecaoColapsavel';
 import { uriParaBlobJpeg, extensaoDeContentType } from '../lib/fotosUpload';
 import { normalizarNomeResponsavel } from '../lib/assinaturas';
 import { COR_MARCA } from '../lib/tema';
+import Icone from '../components/ui/Icone';
+import { BadgeStatus } from '../components/ui/Badge';
+import { SkeletonBloco } from '../components/ui/Skeleton';
 
 // Chave composta: cada resposta pertence a um gerador (os_equipamento) + item específico.
 // Usar só o id do item causava "vazamento" de resposta entre GMG 01 e GMG 02 quando
@@ -1760,8 +1763,17 @@ export default function OSDetail({ osId, userId, onBack }) {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: cores.fundo }]}>
-        <ActivityIndicator color={cores.primario} />
+      <View style={[styles.container, styles.conteudoCentral, { backgroundColor: cores.fundo }]}>
+        <View style={styles.cabecalhoTopRow}>
+          <SkeletonBloco largura={44} altura={44} raio={12} />
+          <View style={{ flex: 1, gap: 8 }}>
+            <SkeletonBloco largura={140} altura={26} />
+            <SkeletonBloco largura={90} altura={22} raio={11} />
+          </View>
+        </View>
+        <SkeletonBloco altura={96} raio={12} style={{ marginBottom: 12 }} />
+        <SkeletonBloco altura={140} raio={12} style={{ marginBottom: 12 }} />
+        <SkeletonBloco altura={56} raio={12} />
       </View>
     );
   }
@@ -1786,26 +1798,35 @@ export default function OSDetail({ osId, userId, onBack }) {
   }
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: cores.fundo }]}>
-      <View style={[styles.cabecalhoStatus, { backgroundColor: corStatus }]}>
-        <View style={styles.cabecalhoTopRow}>
-          <TouchableOpacity onPress={onBack}>
-            <Text style={styles.cabecalhoVoltar}>{'< Voltar'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.atualizarBotao} onPress={atualizarDados} disabled={atualizando}>
-            {atualizando ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={styles.cabecalhoAtualizar}>↻</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.cabecalhoNumero}>OS #{osInfo?.numero ?? '—'}</Text>
-        <View style={styles.statusChip}>
-          <Text style={styles.statusChipTexto}>
-            {iconeStatus(statusOs)} {rotuloStatus(statusOs)}
+    <ScrollView style={[styles.container, { backgroundColor: cores.fundo }]} contentContainerStyle={styles.conteudoCentral}>
+      <View style={styles.cabecalhoTopRow}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Voltar"
+          onPress={onBack}
+          style={[styles.cabecalhoBotao, { borderColor: cores.borda, backgroundColor: cores.fundoCard }]}
+        >
+          <Icone nome="chevronLeft" tamanho={20} cor={cores.texto} />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text accessibilityRole="header" style={[styles.cabecalhoNumero, { color: cores.texto }]}>
+            OS #{osInfo?.numero ?? '—'}
           </Text>
+          <BadgeStatus status={statusOs} />
         </View>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Atualizar dados da OS"
+          style={[styles.cabecalhoBotao, { borderColor: cores.borda, backgroundColor: cores.fundoCard }]}
+          onPress={atualizarDados}
+          disabled={atualizando}
+        >
+          {atualizando ? (
+            <ActivityIndicator size="small" color={cores.primario} />
+          ) : (
+            <Icone nome="refresh" tamanho={18} cor={cores.textoSecundario} />
+          )}
+        </TouchableOpacity>
       </View>
 
       {osInfo?.observacao_correcao ? (
@@ -2544,7 +2565,8 @@ export default function OSDetail({ osId, userId, onBack }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 40, paddingHorizontal: 20, backgroundColor: '#fff' },
+  container: { flex: 1 },
+  conteudoCentral: { width: '100%', maxWidth: 900, alignSelf: 'center', paddingTop: 20, paddingHorizontal: 16, paddingBottom: 40 },
   backButton: { marginBottom: 10 },
   backText: { color: COR_MARCA, fontSize: 16 },
   tituloRow: {
@@ -2818,10 +2840,11 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
   },
-  cabecalhoTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  cabecalhoTopRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
   cabecalhoVoltar: { color: '#fff', fontSize: 16, fontWeight: '600' },
   cabecalhoAtualizar: { color: '#fff', fontSize: 22 },
-  cabecalhoNumero: { color: '#fff', fontSize: 26, fontWeight: 'bold', marginBottom: 8 },
+  cabecalhoNumero: { fontSize: 24, fontWeight: '700', letterSpacing: -0.3, marginBottom: 6 },
+  cabecalhoBotao: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   statusChip: {
     alignSelf: 'flex-start',
     backgroundColor: 'rgba(255,255,255,0.25)',

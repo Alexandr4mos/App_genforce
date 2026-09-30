@@ -160,7 +160,7 @@ export default function ImportarClientes({ onBack }) {
   }
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: cores.fundo }]}>
+    <ScrollView style={[styles.container, { backgroundColor: cores.fundo }]} contentContainerStyle={styles.conteudoCentral}>
       <Text style={[styles.title, { color: cores.texto }]}>Importar clientes</Text>
       <Text style={[styles.texto, { color: cores.textoSecundario }]}>
         Envie um arquivo CSV com as colunas nome, razão social e endereço. A primeira linha pode ser o
@@ -220,7 +220,8 @@ export default function ImportarClientes({ onBack }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, width: '100%', maxWidth: 1100, alignSelf: 'center', paddingTop: 24, paddingHorizontal: 16 },
+  container: { flex: 1 },
+  conteudoCentral: { width: '100%', maxWidth: 1100, alignSelf: 'center', paddingTop: 24, paddingHorizontal: 16, paddingBottom: 40 },
   backButton: { marginBottom: 10 },
   backText: { fontSize: 16 },
   title: { fontSize: 24, fontWeight: '700', letterSpacing: -0.3, marginBottom: 8 },
