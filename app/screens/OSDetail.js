@@ -551,7 +551,8 @@ export default function OSDetail({ osId, userId, onBack }) {
       return;
     }
 
-    setOsInfo(atualizada);
+    // Mescla no estado local — o .select acima é parcial (sem numero/clientes/etc.).
+    setOsInfo((prev) => (prev ? { ...prev, ...atualizada } : atualizada));
   }
 
   async function fazerCheckout() {
@@ -650,7 +651,8 @@ export default function OSDetail({ osId, userId, onBack }) {
       return;
     }
 
-    setOsInfo(atualizada);
+    // Mescla no estado local — o .select acima é parcial (sem numero/clientes/etc.).
+    setOsInfo((prev) => (prev ? { ...prev, ...atualizada } : atualizada));
   }
 
   function formatarHorario(dataIso) {
@@ -1533,14 +1535,18 @@ export default function OSDetail({ osId, userId, onBack }) {
         return;
       }
 
-      setOsInfo((prev) => ({
-        ...prev,
-        status: 'finalizado',
-        aprovado_supervisor: true,
-        aprovado_por: userId,
-        aprovado_em: new Date().toISOString(),
-        observacao_correcao: null,
-      }));
+      setOsInfo((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: 'finalizado',
+              aprovado_supervisor: true,
+              aprovado_por: userId,
+              aprovado_em: new Date().toISOString(),
+              observacao_correcao: null,
+            }
+          : prev
+      );
 
       await abrirRelatorioParaImpressao(osId);
       avisar(
@@ -1577,12 +1583,16 @@ export default function OSDetail({ osId, userId, onBack }) {
       return;
     }
 
-    setOsInfo((prev) => ({
-      ...prev,
-      status: 'andamento',
-      observacao_correcao: textoCorrecao.trim(),
-      aprovado_supervisor: false,
-    }));
+    setOsInfo((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: 'andamento',
+            observacao_correcao: textoCorrecao.trim(),
+            aprovado_supervisor: false,
+          }
+        : prev
+    );
     setMostrarCorrecao(false);
     setTextoCorrecao('');
     avisar('OS devolvida ao técnico com observação de correção.', 'Correção solicitada');
