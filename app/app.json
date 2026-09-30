@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "app",
-    "slug": "app",
+    "name": "Genforce Manutenções",
+    "slug": "genforce-manutencoes",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -11,14 +11,22 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#003399",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       }
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./public/icons/favicon-32.png",
+      "name": "Genforce Manutenções",
+      "shortName": "Genforce",
+      "description": "Ordens de serviço e manutenção de geradores — Genforce Energia",
+      "themeColor": "#003399",
+      "backgroundColor": "#ffffff",
+      "display": "standalone",
+      "lang": "pt-BR",
+      "output": "single"
     }
   }
 }

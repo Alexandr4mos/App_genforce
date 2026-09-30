@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, shrink-to-fit=no, viewport-fit=cover"
+    />
+    <title>Genforce Manutenções</title>
+    <meta name="description" content="Ordens de serviço e manutenção de geradores — Genforce Energia" />
+    <meta name="theme-color" content="#003399" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Genforce" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+    <style>
+      /* Evita flash branco sem conteúdo enquanto o bundle carrega */
+      html,
+      body,
+      #root {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        background: #ffffff;
+      }
+    </style>
+  </head>
+  <body>
+    <noscript>É necessário habilitar JavaScript para usar o Genforce Manutenções.</noscript>
+    <!-- Expo SPA root (Metro injeta o bundle) -->
+    <div id="root"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker
+            .register('/sw.js')
+            .then(function (registration) {
+              // Busca atualização em cada visita (deploy novo no Vercel)
+              registration.update().catch(function () {});
+              registration.addEventListener('updatefound', function () {
+                var novo = registration.installing;
+                if (!novo) return;
+                novo.addEventListener('statechange', function () {
+                  if (novo.state === 'installed' && navigator.serviceWorker.controller) {
+                    // Nova versão pronta — ativa na próxima abertura (skipWaiting no SW)
+                    console.log('[PWA] Nova versão disponível');
+                  }
+                });
+              });
+            })
+            .catch(function (err) {
+              console.warn('[PWA] Service worker não registrado:', err);
+            });
+        });
+      }
+    </script>
+  </body>
+</html>

@@ -30,3 +30,6 @@ yarn-error.*
 .DS_Store
 .metro-health-check*
 *.tsbuildinfo
+
+.vercel
+.env*
