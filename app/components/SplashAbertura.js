@@ -15,60 +15,86 @@ import { BRAND } from '../lib/brand';
 const ICONE = require('../assets-login/genforce-app-icon-source.jpg');
 const LOGO = require('../assets-login/genforce-logo-manutencoes-branca.png');
 
-// Tempos (ms) — total ~1100ms (+ espera de sessão se necessário)
-const T_CRESCER = 350;
-const T_FADE_G = 150; // 0,35–0,50
-const T_LOGO_IN = 200; // 0,45–0,65 (começa quando G < 10%)
-const T_HOLD_ATE = 800; // logo parada até ~0,8s
-const T_FADE_LOGO = 100; // 0,8–0,9
-const T_FADE_FUNDO = 200; // 0,9–1,1
+const T_CRESCER = 400; // 0–0,4s
+const T_TROCA = 200; // 0,4–0,6s
+const T_HOLD = 150; // 0,6–0,75s
+const T_VOO = 600; // 0,75–1,35s
+const T_FADE_FUNDO_APP = 350;
 
 /**
- * Splash de abertura — independente do header.
- * JPG do ícone ~#101115 ≠ #0B0D12 → borderRadius ~22% mascara o retângulo.
+ * Splash de abertura.
+ * - destinoLogin: anima logo até a posição do Login e revela o formulário
+ * - !destinoLogin (app): fade da splash revelando o app (header intacto)
  */
-export default function SplashAbertura({ sessaoPronta, onConcluir }) {
-  const { width: larguraTela } = useWindowDimensions();
+export default function SplashAbertura({
+  sessaoPronta,
+  destinoLogin,
+  loginLogoBox,
+  onRevelarFormulario,
+  onLogoPousou,
+  onConcluir,
+}) {
+  const { width: W, height: H } = useWindowDimensions();
   const [reduzirMovimento, setReduzirMovimento] = useState(null);
-  const [mostrarGEspera, setMostrarGEspera] = useState(false);
+  const [modoEspera, setModoEspera] = useState(false);
+  const [faseVoo, setFaseVoo] = useState(false);
   const concluiuRef = useRef(false);
-  const animacaoProntaRef = useRef(false);
+  const passo2FeitoRef = useRef(false);
   const sessaoRef = useRef(sessaoPronta);
+  const destinoRef = useRef(destinoLogin);
+  const boxRef = useRef(loginLogoBox);
   const pulsoLoopRef = useRef(null);
   const timersRef = useRef([]);
 
   const opacidadeFundo = useRef(new Animated.Value(1)).current;
-  const escalaIcone = useRef(new Animated.Value(1)).current;
+  const escalaIcone = useRef(new Animated.Value(0.4)).current;
   const opacidadeIcone = useRef(new Animated.Value(1)).current;
   const opacidadeLogo = useRef(new Animated.Value(0)).current;
   const escalaLogo = useRef(new Animated.Value(0.95)).current;
-  const brilho = useRef(new Animated.Value(0.35)).current;
+  const logoLeft = useRef(new Animated.Value(0)).current;
+  const logoTop = useRef(new Animated.Value(0)).current;
+  const logoW = useRef(new Animated.Value(0)).current;
+  const logoH = useRef(new Animated.Value(0)).current;
+  const brilho = useRef(new Animated.Value(0)).current;
 
   const usaDriver = Platform.OS !== 'web';
-  const iconeTam = Math.max(96, Math.round(larguraTela * 0.3));
-  const raioIcone = iconeTam * 0.22;
-  const logoLargura = Math.min(larguraTela * 0.6, 420);
-  const logoAltura = logoLargura / 2;
+  const iconeFinal = Math.max(96, Math.round(W * 0.3));
+  const raioIcone = iconeFinal * 0.22;
+  const logoCentroW = Math.min(W * 0.6, 420);
+  const logoCentroH = logoCentroW / 2;
+  const logoCentroLeft = (W - logoCentroW) / 2;
+  const logoCentroTop = (H - logoCentroH) / 2;
 
   useEffect(() => {
-    // Remove splash HTML do primeiro paint sem flash
     if (typeof document !== 'undefined') {
       document.getElementById('splash-boot')?.remove();
     }
+    // Posição inicial da logo (centro)
+    logoLeft.setValue(logoCentroLeft);
+    logoTop.setValue(logoCentroTop);
+    logoW.setValue(logoCentroW);
+    logoH.setValue(logoCentroH);
   }, []);
 
   useEffect(() => {
     sessaoRef.current = sessaoPronta;
-    if (animacaoProntaRef.current && sessaoPronta) {
-      encerrarAposLogo();
+    destinoRef.current = destinoLogin;
+    boxRef.current = loginLogoBox;
+    if (passo2FeitoRef.current && sessaoPronta && modoEspera) {
+      // Saiu da espera: segue do passo 2
+      setModoEspera(false);
+      pararPulso();
+      brilho.setValue(0);
+      iniciarPasso2();
+    } else if (passo2FeitoRef.current && sessaoPronta && !modoEspera && !faseVoo) {
+      // Já estávamos no hold aguardando box/sessão
+      tentarPasso4();
     }
-  }, [sessaoPronta]);
+  }, [sessaoPronta, destinoLogin, loginLogoBox, modoEspera, faseVoo]);
 
   useEffect(() => {
     let ativo = true;
-    const aplicar = (v) => {
-      if (ativo) setReduzirMovimento(Boolean(v));
-    };
+    const aplicar = (v) => ativo && setReduzirMovimento(Boolean(v));
     AccessibilityInfo.isReduceMotionEnabled?.()
       .then(aplicar)
       .catch(() => aplicar(false));
@@ -93,11 +119,9 @@ export default function SplashAbertura({ sessaoPronta, onConcluir }) {
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
   }
-
   function agendar(fn, ms) {
     const id = setTimeout(fn, ms);
     timersRef.current.push(id);
-    return id;
   }
 
   function finalizar() {
@@ -108,84 +132,21 @@ export default function SplashAbertura({ sessaoPronta, onConcluir }) {
     onConcluir?.();
   }
 
-  function fadeFundoESair() {
-    if (concluiuRef.current) return;
-    setMostrarGEspera(false);
-    pararPulso();
-    Animated.timing(opacidadeFundo, {
-      toValue: 0,
-      duration: T_FADE_FUNDO,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: usaDriver,
-    }).start(({ finished }) => {
-      if (finished) finalizar();
-    });
-  }
-
-  /** Logo some primeiro; só depois o fundo. */
-  function encerrarAposLogo() {
-    if (concluiuRef.current) return;
-    setMostrarGEspera(false);
-    pararPulso();
-    Animated.timing(opacidadeLogo, {
-      toValue: 0,
-      duration: T_FADE_LOGO,
-      useNativeDriver: usaDriver,
-    }).start(({ finished }) => {
-      if (!finished || concluiuRef.current) return;
-      fadeFundoESair();
-    });
-  }
-
-  function marcarAnimacaoPronta() {
-    if (concluiuRef.current) return;
-    animacaoProntaRef.current = true;
-    if (sessaoRef.current) {
-      encerrarAposLogo();
-    } else {
-      // Sessão lenta: some logo, mantém G com glow pulsando
-      Animated.timing(opacidadeLogo, {
-        toValue: 0,
-        duration: T_FADE_LOGO,
-        useNativeDriver: usaDriver,
-      }).start(() => {
-        if (concluiuRef.current) return;
-        opacidadeIcone.setValue(1);
-        escalaIcone.setValue(1);
-        setMostrarGEspera(true);
-        iniciarPulso();
-      });
-    }
-  }
-
   function iniciarPulso() {
     pararPulso();
-    brilho.setValue(0.35);
+    brilho.setValue(0.2);
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(brilho, {
-          toValue: 0.75,
-          duration: 700,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: usaDriver,
-        }),
-        Animated.timing(brilho, {
-          toValue: 0.3,
-          duration: 700,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: usaDriver,
-        }),
+        Animated.timing(brilho, { toValue: 0.45, duration: 700, easing: Easing.inOut(Easing.sin), useNativeDriver: usaDriver }),
+        Animated.timing(brilho, { toValue: 0.15, duration: 700, easing: Easing.inOut(Easing.sin), useNativeDriver: usaDriver }),
       ])
     );
     pulsoLoopRef.current = loop;
     loop.start();
   }
-
   function pararPulso() {
-    if (pulsoLoopRef.current) {
-      pulsoLoopRef.current.stop();
-      pulsoLoopRef.current = null;
-    }
+    pulsoLoopRef.current?.stop();
+    pulsoLoopRef.current = null;
   }
 
   function pular() {
@@ -194,83 +155,109 @@ export default function SplashAbertura({ sessaoPronta, onConcluir }) {
     escalaIcone.stopAnimation();
     opacidadeIcone.stopAnimation();
     opacidadeLogo.stopAnimation();
-    escalaLogo.stopAnimation();
-    brilho.stopAnimation();
+    opacidadeFundo.stopAnimation();
+    onLogoPousou?.();
+    onRevelarFormulario?.();
     opacidadeIcone.setValue(0);
-    opacidadeLogo.setValue(1);
-    escalaLogo.setValue(1);
-    brilho.setValue(0);
-    marcarAnimacaoPronta();
+    opacidadeLogo.setValue(0);
+    opacidadeFundo.setValue(0);
+    finalizar();
+  }
+
+  function fadeSplashApp() {
+    // Logado: some logo da splash e o fundo
+    Animated.parallel([
+      Animated.timing(opacidadeLogo, { toValue: 0, duration: 180, useNativeDriver: usaDriver }),
+      Animated.timing(opacidadeFundo, { toValue: 0, duration: T_FADE_FUNDO_APP, useNativeDriver: usaDriver }),
+    ]).start(({ finished }) => {
+      if (finished) finalizar();
+    });
+  }
+
+  function iniciarPasso2() {
+    // G some, logo aparece (nunca juntos)
+    Animated.timing(opacidadeIcone, {
+      toValue: 0,
+      duration: T_TROCA / 2,
+      useNativeDriver: usaDriver,
+    }).start(({ finished }) => {
+      if (!finished || concluiuRef.current) return;
+      Animated.parallel([
+        Animated.timing(opacidadeLogo, { toValue: 1, duration: T_TROCA / 2, useNativeDriver: usaDriver }),
+        Animated.timing(escalaLogo, { toValue: 1, duration: T_TROCA / 2, easing: Easing.out(Easing.cubic), useNativeDriver: usaDriver }),
+      ]).start(({ finished: ok }) => {
+        if (!ok || concluiuRef.current) return;
+        passo2FeitoRef.current = true;
+        agendar(() => tentarPasso4(), T_HOLD);
+      });
+    });
+  }
+
+  function tentarPasso4() {
+    if (concluiuRef.current || faseVoo) return;
+    if (!sessaoRef.current) return;
+
+    if (!destinoRef.current) {
+      fadeSplashApp();
+      return;
+    }
+
+    const box = boxRef.current;
+    if (!box || box.width <= 0) {
+      // Espera onLayout do Login
+      return;
+    }
+
+    setFaseVoo(true);
+    onRevelarFormulario?.();
+
+    // Voo da logo + fade do fundo
+    Animated.parallel([
+      Animated.timing(logoLeft, { toValue: box.x, duration: T_VOO, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }),
+      Animated.timing(logoTop, { toValue: box.y, duration: T_VOO, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }),
+      Animated.timing(logoW, { toValue: box.width, duration: T_VOO, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }),
+      Animated.timing(logoH, { toValue: box.height, duration: T_VOO, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }),
+      Animated.timing(opacidadeFundo, {
+        toValue: 0,
+        duration: T_VOO,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+    ]).start(({ finished }) => {
+      if (!finished || concluiuRef.current) return;
+      // Login logo no mesmo lugar; splash some no frame seguinte (sem gap vazio)
+      onLogoPousou?.();
+      requestAnimationFrame(() => {
+        if (concluiuRef.current) return;
+        opacidadeLogo.setValue(0);
+        finalizar();
+      });
+    });
   }
 
   useEffect(() => {
     if (reduzirMovimento === null) return;
     if (reduzirMovimento) {
-      opacidadeIcone.setValue(0);
-      opacidadeLogo.setValue(1);
-      escalaLogo.setValue(1);
-      marcarAnimacaoPronta();
+      pular();
       return;
     }
 
-    // 1) 0–0,35s: G ~30% tela, scale 1→1,08 + glow no contorno
-    Animated.parallel([
-      Animated.timing(escalaIcone, {
-        toValue: 1.08,
-        duration: T_CRESCER,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: usaDriver,
-      }),
-      Animated.timing(brilho, {
-        toValue: 0.7,
-        duration: T_CRESCER,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: usaDriver,
-      }),
-    ]).start(({ finished }) => {
+    // 1) G vem de longe (scale 0,4 → 1), tamanho final ~30% largura — sem glow
+    Animated.timing(escalaIcone, {
+      toValue: 1,
+      duration: T_CRESCER,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: usaDriver,
+    }).start(({ finished }) => {
       if (!finished || concluiuRef.current) return;
 
-      // 2) G some (0,35–0,50). Logo só entra quando G < 10%.
-      const fadeG = Animated.timing(opacidadeIcone, {
-        toValue: 0,
-        duration: T_FADE_G,
-        easing: Easing.in(Easing.quad),
-        useNativeDriver: usaDriver,
-      });
-      Animated.timing(brilho, {
-        toValue: 0,
-        duration: T_FADE_G,
-        useNativeDriver: usaDriver,
-      }).start();
-
-      // Quando G chega a ~10%: após 90% do fade (~135ms)
-      agendar(() => {
-        if (concluiuRef.current) return;
-        // 3) logo 0,45–0,65
-        Animated.parallel([
-          Animated.timing(opacidadeLogo, {
-            toValue: 1,
-            duration: T_LOGO_IN,
-            useNativeDriver: usaDriver,
-          }),
-          Animated.timing(escalaLogo, {
-            toValue: 1,
-            duration: T_LOGO_IN,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: usaDriver,
-          }),
-        ]).start();
-      }, Math.round(T_FADE_G * 0.9));
-
-      fadeG.start(({ finished: ok }) => {
-        if (!ok || concluiuRef.current) return;
-        // Hold até 0,8s desde o início: 800 - 500 = 300ms após fim do fade G
-        const ja = T_CRESCER + T_FADE_G;
-        const restoHold = Math.max(0, T_HOLD_ATE - ja);
-        agendar(() => {
-          if (!concluiuRef.current) marcarAnimacaoPronta();
-        }, restoHold);
-      });
+      if (!sessaoRef.current) {
+        // Espera sessão com G + glow sutil
+        setModoEspera(true);
+        iniciarPulso();
+        return;
+      }
+      iniciarPasso2();
     });
 
     return () => {
@@ -278,25 +265,24 @@ export default function SplashAbertura({ sessaoPronta, onConcluir }) {
       pararPulso();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reduzirMovimento, iconeTam]);
+  }, [reduzirMovimento]);
 
   const glowStyle = Platform.select({
-    web: {
-      boxShadow: `0 0 28px 4px ${BRAND.destaque}`,
-    },
+    web: { boxShadow: `0 0 22px 2px ${BRAND.destaque}` },
     default: {
       shadowColor: BRAND.destaque,
       shadowOpacity: 1,
-      shadowRadius: 22,
+      shadowRadius: 16,
       shadowOffset: { width: 0, height: 0 },
     },
   });
 
   return (
-    <Animated.View
-      pointerEvents="auto"
-      style={[styles.overlay, { backgroundColor: BRAND.fundo, opacity: opacidadeFundo }]}
-    >
+    <View style={styles.overlay} pointerEvents="box-none">
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { backgroundColor: BRAND.fundo, opacity: opacidadeFundo }]}
+      />
       <Pressable
         style={StyleSheet.absoluteFill}
         onPress={pular}
@@ -305,34 +291,36 @@ export default function SplashAbertura({ sessaoPronta, onConcluir }) {
       />
 
       <View style={styles.centro} pointerEvents="none">
-        {/* Glow = mesma forma arredondada do ícone (não círculo) */}
-        <Animated.View
-          style={[
-            {
-              position: 'absolute',
-              width: iconeTam,
-              height: iconeTam,
-              borderRadius: raioIcone,
-              backgroundColor: 'transparent',
-              opacity: brilho,
-              transform: [{ scale: escalaIcone }],
-            },
-            glowStyle,
-          ]}
-        />
-
         <Animated.View
           style={{
-            position: 'absolute',
             opacity: opacidadeIcone,
             transform: [{ scale: escalaIcone }],
+            width: iconeFinal,
+            height: iconeFinal,
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
+          {modoEspera ? (
+            <Animated.View
+              style={[
+                {
+                  position: 'absolute',
+                  width: iconeFinal,
+                  height: iconeFinal,
+                  borderRadius: raioIcone,
+                  backgroundColor: 'transparent',
+                  opacity: brilho,
+                },
+                glowStyle,
+              ]}
+            />
+          ) : null}
           <Image
             source={ICONE}
             style={{
-              width: iconeTam,
-              height: iconeTam,
+              width: iconeFinal,
+              height: iconeFinal,
               borderRadius: raioIcone,
               overflow: 'hidden',
               backgroundColor: BRAND.fundo,
@@ -341,19 +329,21 @@ export default function SplashAbertura({ sessaoPronta, onConcluir }) {
           />
         </Animated.View>
 
-        {!mostrarGEspera ? (
-          <Animated.View
-            style={{
-              position: 'absolute',
-              opacity: opacidadeLogo,
-              transform: [{ scale: escalaLogo }],
-            }}
-          >
-            <Image source={LOGO} style={{ width: logoLargura, height: logoAltura }} resizeMode="contain" />
-          </Animated.View>
-        ) : null}
+        <Animated.View
+          style={{
+            position: 'absolute',
+            left: logoLeft,
+            top: logoTop,
+            width: logoW,
+            height: logoH,
+            opacity: opacidadeLogo,
+            transform: faseVoo ? [] : [{ scale: escalaLogo }],
+          }}
+        >
+          <Image source={LOGO} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+        </Animated.View>
       </View>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -362,12 +352,9 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 9999,
     elevation: 9999,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   centro: {
-    width: '100%',
-    height: '100%',
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
   },

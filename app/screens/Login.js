@@ -14,17 +14,14 @@ import { BRAND } from '../lib/brand';
 const FOTO_CAPA = require('../assets-login/foto-geradores-capa.jpg');
 const LOGO = require('../assets-login/genforce-logo-manutencoes-branca.png');
 
-// Overlay #0B0D12: 85% no topo (atrás da logo) → 45% embaixo (foto ainda aparece)
 const OVERLAY_TOP = 0.85;
 const OVERLAY_BOTTOM = 0.45;
-const OVERLAY_RGB = '11,13,18'; // #0B0D12
+const OVERLAY_RGB = '11,13,18';
 
 const GRADIENTE_WEB = `linear-gradient(180deg, rgba(${OVERLAY_RGB},${OVERLAY_TOP}) 0%, rgba(${OVERLAY_RGB},0.68) 42%, rgba(${OVERLAY_RGB},${OVERLAY_BOTTOM}) 100%)`;
-
 const GRADIENTE_FATIAS = 48;
 
 function opacidadeGradiente(t) {
-  // t=0 topo → t=1 base
   return OVERLAY_TOP + (OVERLAY_BOTTOM - OVERLAY_TOP) * t;
 }
 
@@ -32,7 +29,6 @@ function OverlayGradiente() {
   if (Platform.OS === 'web') {
     return <View style={styles.gradienteWeb} pointerEvents="none" />;
   }
-
   return (
     <View style={styles.gradienteWrap} pointerEvents="none">
       {Array.from({ length: GRADIENTE_FATIAS }, (_, i) => {
@@ -55,6 +51,11 @@ function OverlayGradiente() {
   );
 }
 
+/**
+ * @param {boolean} logoVisivel — controlado pela splash (opacity 0 até pousar)
+ * @param {boolean} revelarFormulario — dispara fade-in escalonado dos campos
+ * @param {(box:{x,y,width,height})=>void} onLogoMedida — measureInWindow da logo
+ */
 export default function Login({
   usuario,
   password,
@@ -63,25 +64,54 @@ export default function Login({
   onEntrar,
   loading,
   errorMsg,
+  logoVisivel = true,
+  revelarFormulario = true,
+  onLogoMedida,
 }) {
   const zoom = useRef(new Animated.Value(1.06)).current;
-  const fade = useRef(new Animated.Value(0)).current;
-  const slide = useRef(new Animated.Value(36)).current;
+  const logoRef = useRef(null);
+  const usaDriver = Platform.OS !== 'web';
 
-  const usaDriverNativo = Platform.OS !== 'web';
+  const fadeUsuario = useRef(new Animated.Value(revelarFormulario ? 1 : 0)).current;
+  const fadeSenha = useRef(new Animated.Value(revelarFormulario ? 1 : 0)).current;
+  const fadeBotao = useRef(new Animated.Value(revelarFormulario ? 1 : 0)).current;
+  const fadeAviso = useRef(new Animated.Value(revelarFormulario ? 1 : 0)).current;
+  const slideUsuario = useRef(new Animated.Value(revelarFormulario ? 0 : 12)).current;
+  const slideSenha = useRef(new Animated.Value(revelarFormulario ? 0 : 12)).current;
+  const slideBotao = useRef(new Animated.Value(revelarFormulario ? 0 : 12)).current;
+  const slideAviso = useRef(new Animated.Value(revelarFormulario ? 0 : 12)).current;
 
   useEffect(() => {
     Animated.timing(zoom, {
       toValue: 1.14,
       duration: 16000,
-      useNativeDriver: usaDriverNativo,
+      useNativeDriver: usaDriver,
     }).start();
+  }, [zoom, usaDriver]);
 
+  useEffect(() => {
+    if (!revelarFormulario) return;
+    const dur = 280;
+    const gap = 60;
+    const mk = (op, sl, delay) =>
+      Animated.parallel([
+        Animated.timing(op, { toValue: 1, duration: dur, delay, useNativeDriver: usaDriver }),
+        Animated.timing(sl, { toValue: 0, duration: dur, delay, useNativeDriver: usaDriver }),
+      ]);
     Animated.parallel([
-      Animated.timing(fade, { toValue: 1, duration: 900, useNativeDriver: usaDriverNativo }),
-      Animated.timing(slide, { toValue: 0, duration: 900, useNativeDriver: usaDriverNativo }),
+      mk(fadeUsuario, slideUsuario, 0),
+      mk(fadeSenha, slideSenha, gap),
+      mk(fadeBotao, slideBotao, gap * 2),
+      mk(fadeAviso, slideAviso, gap * 3),
     ]).start();
-  }, [fade, slide, zoom, usaDriverNativo]);
+  }, [revelarFormulario, usaDriver, fadeUsuario, fadeSenha, fadeBotao, fadeAviso, slideUsuario, slideSenha, slideBotao, slideAviso]);
+
+  function reportarMedida() {
+    if (!onLogoMedida || !logoRef.current?.measureInWindow) return;
+    logoRef.current.measureInWindow((x, y, width, height) => {
+      if (width > 0 && height > 0) onLogoMedida({ x, y, width, height });
+    });
+  }
 
   return (
     <View style={styles.tela}>
@@ -95,46 +125,57 @@ export default function Login({
 
       <OverlayGradiente />
 
-      <Animated.View
-        style={[
-          styles.conteudo,
-          { opacity: fade, transform: [{ translateY: slide }] },
-        ]}
-      >
+      <View style={styles.conteudo}>
         <View style={styles.logoWrap}>
-          <Image source={LOGO} style={styles.logoImg} resizeMode="contain" />
+          <Image
+            ref={logoRef}
+            collapsable={false}
+            source={LOGO}
+            style={[styles.logoImg, { opacity: logoVisivel ? 1 : 0 }]}
+            resizeMode="contain"
+            onLayout={reportarMedida}
+            onLoad={reportarMedida}
+          />
         </View>
 
-        <TextInput
-          style={styles.pilula}
-          placeholder="Usuário"
-          placeholderTextColor="#888"
-          autoCapitalize="none"
-          autoCorrect={false}
-          value={usuario}
-          onChangeText={onUsuario}
-        />
-        <TextInput
-          style={styles.pilula}
-          placeholder="Senha"
-          placeholderTextColor="#888"
-          secureTextEntry
-          value={password}
-          onChangeText={onPassword}
-        />
+        <Animated.View style={{ width: '100%', maxWidth: 420, opacity: fadeUsuario, transform: [{ translateY: slideUsuario }] }}>
+          <TextInput
+            style={styles.pilula}
+            placeholder="Usuário"
+            placeholderTextColor="#888"
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={usuario}
+            onChangeText={onUsuario}
+          />
+        </Animated.View>
+        <Animated.View style={{ width: '100%', maxWidth: 420, opacity: fadeSenha, transform: [{ translateY: slideSenha }] }}>
+          <TextInput
+            style={styles.pilula}
+            placeholder="Senha"
+            placeholderTextColor="#888"
+            secureTextEntry
+            value={password}
+            onChangeText={onPassword}
+          />
+        </Animated.View>
 
         {errorMsg ? <Text style={styles.erro}>{errorMsg}</Text> : null}
 
-        <TouchableOpacity
-          style={[styles.botaoEntrar, { backgroundColor: BRAND.destaque }]}
-          onPress={onEntrar}
-          disabled={loading}
-        >
-          <Text style={styles.botaoEntrarTexto}>{loading ? 'Entrando...' : 'Entrar'}</Text>
-        </TouchableOpacity>
+        <Animated.View style={{ width: '100%', maxWidth: 420, opacity: fadeBotao, transform: [{ translateY: slideBotao }] }}>
+          <TouchableOpacity
+            style={[styles.botaoEntrar, { backgroundColor: BRAND.destaque }]}
+            onPress={onEntrar}
+            disabled={loading}
+          >
+            <Text style={styles.botaoEntrarTexto}>{loading ? 'Entrando...' : 'Entrar'}</Text>
+          </TouchableOpacity>
+        </Animated.View>
 
-        <Text style={styles.temaAviso}>Genforce Engenharia</Text>
-      </Animated.View>
+        <Animated.View style={{ opacity: fadeAviso, transform: [{ translateY: slideAviso }] }}>
+          <Text style={styles.temaAviso}>Genforce Engenharia</Text>
+        </Animated.View>
+      </View>
     </View>
   );
 }
@@ -153,24 +194,15 @@ const styles = StyleSheet.create({
     width: '120%',
     height: '120%',
     ...(Platform.OS === 'web'
-      ? {
-          objectFit: 'cover',
-          objectPosition: 'center center',
-        }
+      ? { objectFit: 'cover', objectPosition: 'center center' }
       : null),
   },
-  gradienteWrap: {
-    ...StyleSheet.absoluteFillObject,
-  },
+  gradienteWrap: { ...StyleSheet.absoluteFillObject },
   gradienteWeb: {
     ...StyleSheet.absoluteFillObject,
     backgroundImage: GRADIENTE_WEB,
   },
-  gradienteFatia: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-  },
+  gradienteFatia: { position: 'absolute', left: 0, right: 0 },
   conteudo: {
     flex: 1,
     paddingHorizontal: 28,
@@ -188,7 +220,6 @@ const styles = StyleSheet.create({
   logoImg: {
     width: 244,
     height: 122,
-    // Sombra suave #0B0D12 ~60%, blur 14px, sem deslocamento
     ...(Platform.OS === 'web'
       ? { filter: 'drop-shadow(0 0 14px rgba(11,13,18,0.60))' }
       : {
@@ -200,7 +231,6 @@ const styles = StyleSheet.create({
   },
   pilula: {
     width: '100%',
-    maxWidth: 420,
     backgroundColor: '#fff',
     borderRadius: 28,
     paddingVertical: 14,
@@ -209,14 +239,9 @@ const styles = StyleSheet.create({
     color: '#111',
     marginBottom: 12,
   },
-  erro: {
-    color: '#ffb4b4',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
+  erro: { color: '#ffb4b4', marginBottom: 10, textAlign: 'center' },
   botaoEntrar: {
     width: '100%',
-    maxWidth: 420,
     borderRadius: 28,
     paddingVertical: 14,
     alignItems: 'center',

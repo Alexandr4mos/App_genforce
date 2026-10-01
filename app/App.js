@@ -41,6 +41,9 @@ function AppInterno() {
   const [session, setSession] = useState(null);
   const [sessaoCarregada, setSessaoCarregada] = useState(false);
   const [splashVisivel, setSplashVisivel] = useState(true);
+  const [loginLogoBox, setLoginLogoBox] = useState(null);
+  const [loginLogoVisivel, setLoginLogoVisivel] = useState(false);
+  const [revelarFormLogin, setRevelarFormLogin] = useState(false);
   const [usuarioLogin, setUsuarioLogin] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -156,6 +159,9 @@ function AppInterno() {
           onEntrar={handleLogin}
           loading={loading}
           errorMsg={errorMsg}
+          logoVisivel={!splashVisivel || loginLogoVisivel}
+          revelarFormulario={!splashVisivel || revelarFormLogin}
+          onLogoMedida={setLoginLogoBox}
         />
       </>
     );
@@ -263,7 +269,14 @@ function AppInterno() {
     <View style={styles.raiz}>
       {appPorBaixo}
       {splashVisivel ? (
-        <SplashAbertura sessaoPronta={sessaoCarregada} onConcluir={() => setSplashVisivel(false)} />
+        <SplashAbertura
+          sessaoPronta={sessaoCarregada}
+          destinoLogin={sessaoCarregada && !session}
+          loginLogoBox={loginLogoBox}
+          onRevelarFormulario={() => setRevelarFormLogin(true)}
+          onLogoPousou={() => setLoginLogoVisivel(true)}
+          onConcluir={() => setSplashVisivel(false)}
+        />
       ) : null}
     </View>
   );
