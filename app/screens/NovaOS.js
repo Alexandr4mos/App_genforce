@@ -9,7 +9,7 @@ import {
   Button,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { TIPOS_OS, PRIORIDADES_OS, TEMPLATE_PADRAO_ID, statusEfetivo, PERIODICIDADES_MANUTENCAO, rotuloPeriodicidade } from '../lib/constantes';
+import { TIPOS_OS, PRIORIDADES_OS, TEMPLATE_PADRAO_ID, statusEfetivo, rotuloPeriodicidade } from '../lib/constantes';
 import { useTema } from '../lib/tema';
 import { avisar } from '../lib/avisos';
 import SeletorCliente from '../components/SeletorCliente';
@@ -19,6 +19,16 @@ import FormularioEquipamento from '../components/FormularioEquipamento';
 import { cnpjValido, limparNumeros } from '../lib/mascaras';
 import { gruposOpcionaisPadraoNovaOs, salvarGruposOpcionais } from '../lib/gruposOS';
 import { COR_MARCA } from '../lib/tema';
+import {
+  EQUIPAMENTO_FORM_VAZIO,
+  EQUIPAMENTO_LISTA_SELECT,
+  EQUIPAMENTO_COMPLETO_SELECT,
+  valoresFromEquipamento,
+  payloadFromValores,
+  validarFiltrosForm,
+  filtrosFromRows,
+  substituirFiltrosEquipamento,
+} from '../lib/equipamentoForm';
 
 export default function NovaOS({ onBack, onCriada }) {
   const { cores } = useTema();
@@ -32,25 +42,7 @@ export default function NovaOS({ onBack, onCriada }) {
   const [equipamentosSelecionados, setEquipamentosSelecionados] = useState({});
 
   const [mostrarNovoEquipamento, setMostrarNovoEquipamento] = useState(false);
-  const [novoEquipamento, setNovoEquipamento] = useState({
-    tag: '',
-    fabricante_gmg: '',
-    potencia_kva: '',
-    tensao: '',
-    tipo_gmg: '',
-    n_serie_gmg: '',
-    ano_fabricacao: '',
-    fabricante_motor: '',
-    modelo_motor: '',
-    n_serie_motor: '',
-    placa_motor: '',
-    fabricante_alternador: '',
-    modelo_alternador: '',
-    n_serie_alternador: '',
-    placa_alternador: '',
-    data_inicio_contrato: '',
-    periodicidade_manutencao: '',
-  });
+  const [novoEquipamento, setNovoEquipamento] = useState({ ...EQUIPAMENTO_FORM_VAZIO });
   const [novosFiltros, setNovosFiltros] = useState([]);
   const [salvandoEquipamento, setSalvandoEquipamento] = useState(false);
 
@@ -80,28 +72,45 @@ export default function NovaOS({ onBack, onCriada }) {
 
   const [unidadeSelecionadaInfo, setUnidadeSelecionadaInfo] = useState(null);
   const [equipamentoEditandoId, setEquipamentoEditandoId] = useState(null);
-  const [edTag, setEdTag] = useState('');
-  const [edPeriodicidade, setEdPeriodicidade] = useState('');
+  const [edicaoEquipamento, setEdicaoEquipamento] = useState({ ...EQUIPAMENTO_FORM_VAZIO });
+  const [edicaoFiltros, setEdicaoFiltros] = useState([]);
+  const [carregandoEdicaoEquipamento, setCarregandoEdicaoEquipamento] = useState(false);
   const [salvandoEdicaoEquipamento, setSalvandoEdicaoEquipamento] = useState(false);
+  const edicaoRequestRef = useRef(0);
+  // Refs sincronizadas: respostas async antigas são ignoradas se o id já mudou.
+  const clienteIdRef = useRef(null);
+  const unidadeIdRef = useRef(null);
   const unidadesRequestRef = useRef(0);
+  const equipamentosRequestRef = useRef(0);
   const clienteNomeSelecionado = clientes.find((c) => c.id === clienteId)?.nome || '';
 
   const geradoresMarcados = equipamentos.filter((e) => equipamentosSelecionados[e.id]);
 
-  function alternarTipo(valor) {
-    setTiposSelecionados((prev) => ({ ...prev, [valor]: !prev[valor] }));
-  }
-
-  function selecionarCliente(c) {
-    // Invalida fetch de unidades do cliente anterior (evita mostrar unidade/cliente errado).
-    unidadesRequestRef.current += 1;
-    setClienteId(c.id);
+  function limparUnidadeEGeradores() {
+    unidadeIdRef.current = null;
+    equipamentosRequestRef.current += 1;
+    edicaoRequestRef.current += 1;
     setUnidades([]);
     setUnidadeId(null);
     setUnidadeSelecionadaInfo(null);
     setEquipamentos([]);
     setEquipamentosSelecionados({});
     setEquipamentoEditandoId(null);
+    setEdicaoEquipamento({ ...EQUIPAMENTO_FORM_VAZIO });
+    setEdicaoFiltros([]);
+    setCarregandoEdicaoEquipamento(false);
+  }
+
+  function alternarTipo(valor) {
+    setTiposSelecionados((prev) => ({ ...prev, [valor]: !prev[valor] }));
+  }
+
+  function selecionarCliente(c) {
+    // Invalida qualquer fetch de unidades/geradores ainda em voo.
+    unidadesRequestRef.current += 1;
+    clienteIdRef.current = c.id;
+    setClienteId(c.id);
+    limparUnidadeEGeradores();
     setMostrarNovaUnidade(false);
     setMostrarNovoEquipamento(false);
   }
@@ -113,15 +122,18 @@ export default function NovaOS({ onBack, onCriada }) {
   useEffect(() => {
     if (clienteId) carregarUnidades(clienteId);
     else {
-      setUnidades([]);
-      setUnidadeId(null);
-      setUnidadeSelecionadaInfo(null);
+      clienteIdRef.current = null;
+      limparUnidadeEGeradores();
     }
   }, [clienteId]);
 
   useEffect(() => {
-    if (unidadeId) carregarEquipamentos(unidadeId);
-    else {
+    if (unidadeId) {
+      unidadeIdRef.current = unidadeId;
+      carregarEquipamentos(unidadeId);
+    } else {
+      unidadeIdRef.current = null;
+      equipamentosRequestRef.current += 1;
       setEquipamentos([]);
       setEquipamentosSelecionados({});
     }
@@ -136,31 +148,40 @@ export default function NovaOS({ onBack, onCriada }) {
     const requestId = ++unidadesRequestRef.current;
     const { data } = await supabase
       .from('unidades')
-      .select('id, nome, endereco')
+      .select('id, nome, endereco, cliente_id')
       .eq('cliente_id', idCliente)
       .order('nome');
 
-    // Ignora resposta antiga (race ao trocar de cliente).
+    // Ignora se o usuário já trocou de cliente (ou invalidou a fila).
     if (requestId !== unidadesRequestRef.current) return;
+    if (clienteIdRef.current !== idCliente) return;
 
-    const lista = data || [];
+    const lista = (data || []).filter((u) => u.cliente_id === idCliente);
     setUnidades(lista);
 
     if (lista.length === 1) {
-      setUnidadeId(lista[0].id);
-      setUnidadeSelecionadaInfo(lista[0]);
+      const unica = lista[0];
+      unidadeIdRef.current = unica.id;
+      setUnidadeId(unica.id);
+      setUnidadeSelecionadaInfo(unica);
     } else {
+      unidadeIdRef.current = null;
       setUnidadeId(null);
       setUnidadeSelecionadaInfo(null);
     }
   }
 
   async function carregarEquipamentos(idUnidade) {
+    const requestId = ++equipamentosRequestRef.current;
     const { data } = await supabase
       .from('equipamentos')
-      .select('id, tag, fabricante_gmg, periodicidade_manutencao')
+      .select(EQUIPAMENTO_LISTA_SELECT)
       .eq('unidade_id', idUnidade)
       .order('tag');
+
+    if (requestId !== equipamentosRequestRef.current) return;
+    if (unidadeIdRef.current !== idUnidade) return;
+
     setEquipamentos(data || []);
     setEquipamentosSelecionados({});
     setEquipamentoEditandoId(null);
@@ -170,38 +191,95 @@ export default function NovaOS({ onBack, onCriada }) {
     setEquipamentosSelecionados((prev) => ({ ...prev, [idEquipamento]: !prev[idEquipamento] }));
   }
 
-  function abrirEdicaoEquipamento(e) {
+  function fecharEdicaoEquipamento() {
+    edicaoRequestRef.current += 1;
+    setEquipamentoEditandoId(null);
+    setEdicaoEquipamento({ ...EQUIPAMENTO_FORM_VAZIO });
+    setEdicaoFiltros([]);
+    setCarregandoEdicaoEquipamento(false);
+  }
+
+  async function abrirEdicaoEquipamento(e) {
+    const requestId = ++edicaoRequestRef.current;
     setEquipamentoEditandoId(e.id);
-    setEdTag(e.tag || '');
-    setEdPeriodicidade(e.periodicidade_manutencao || '');
+    setCarregandoEdicaoEquipamento(true);
+    setEdicaoEquipamento(valoresFromEquipamento(e));
+    setEdicaoFiltros([]);
+    setMostrarNovoEquipamento(false);
+
+    const [{ data: completo, error }, { data: filtrosDb, error: erroFiltros }] = await Promise.all([
+      supabase.from('equipamentos').select(EQUIPAMENTO_COMPLETO_SELECT).eq('id', e.id).single(),
+      supabase
+        .from('equipamento_filtros')
+        .select('id, tipo_filtro, numero_peca, observacao')
+        .eq('equipamento_id', e.id)
+        .order('tipo_filtro'),
+    ]);
+
+    if (requestId !== edicaoRequestRef.current) return;
+
+    if (error) {
+      console.log(error);
+      setCarregandoEdicaoEquipamento(false);
+      avisar(error.message || 'Tente novamente.', 'Erro ao carregar gerador');
+      fecharEdicaoEquipamento();
+      return;
+    }
+    if (erroFiltros) console.log(erroFiltros);
+
+    setEdicaoEquipamento(valoresFromEquipamento(completo));
+    setEdicaoFiltros(filtrosFromRows(filtrosDb));
+    setCarregandoEdicaoEquipamento(false);
+  }
+
+  function alterarEdicaoEquipamento(campo, valor) {
+    setEdicaoEquipamento((prev) => ({ ...prev, [campo]: valor }));
   }
 
   async function salvarEdicaoEquipamento() {
-    if (!edTag.trim()) {
+    if (!edicaoEquipamento.tag.trim()) {
       avisar('Informe a identificação do gerador (ex: GMG 03).', 'Preencha o campo obrigatório');
       return;
     }
 
+    const filtrosCheck = validarFiltrosForm(edicaoFiltros);
+    if (!filtrosCheck.ok) {
+      avisar(filtrosCheck.mensagem, 'Filtros incompletos');
+      return;
+    }
+
+    const idEditando = equipamentoEditandoId;
     setSalvandoEdicaoEquipamento(true);
-    const dadosAtualizados = {
-      tag: edTag.trim(),
-      periodicidade_manutencao: edPeriodicidade?.trim() || null,
-    };
-    const { error } = await supabase
-      .from('equipamentos')
-      .update(dadosAtualizados)
-      .eq('id', equipamentoEditandoId);
-    setSalvandoEdicaoEquipamento(false);
+    const dadosAtualizados = payloadFromValores(edicaoEquipamento);
+    const { error } = await supabase.from('equipamentos').update(dadosAtualizados).eq('id', idEditando);
 
     if (error) {
+      setSalvandoEdicaoEquipamento(false);
       avisar(error.message || 'Tente novamente.', 'Erro ao salvar gerador');
       return;
     }
 
+    const erroFiltros = await substituirFiltrosEquipamento(supabase, idEditando, filtrosCheck.filtros);
+    setSalvandoEdicaoEquipamento(false);
+
+    if (erroFiltros) {
+      avisar(erroFiltros.message || 'Tente novamente.', 'Gerador salvo, mas filtros não foram gravados');
+      return;
+    }
+
     setEquipamentos((prev) =>
-      prev.map((e) => (e.id === equipamentoEditandoId ? { ...e, ...dadosAtualizados } : e))
+      prev.map((eq) =>
+        eq.id === idEditando
+          ? {
+              ...eq,
+              tag: dadosAtualizados.tag,
+              fabricante_gmg: dadosAtualizados.fabricante_gmg,
+              periodicidade_manutencao: dadosAtualizados.periodicidade_manutencao,
+            }
+          : eq
+      )
     );
-    setEquipamentoEditandoId(null);
+    fecharEdicaoEquipamento();
   }
 
   function abrirFormNovaUnidade() {
@@ -252,7 +330,11 @@ export default function NovaOS({ onBack, onCriada }) {
     }
 
     setClientes((prev) => [...prev, data].sort((a, b) => a.nome.localeCompare(b.nome)));
+    // Mesmo fluxo de selecionarCliente: limpa e invalida fetches do cliente anterior.
+    unidadesRequestRef.current += 1;
+    clienteIdRef.current = data.id;
     setClienteId(data.id);
+    limparUnidadeEGeradores();
     setNovoCliente({ nome: '', cnpj: '', telefone: '', telefone_alternativo: '', email: '', email_alternativo: '', cidade: '', uf: '' });
     setMostrarNovoCliente(false);
   }
@@ -267,17 +349,18 @@ export default function NovaOS({ onBack, onCriada }) {
       return;
     }
 
+    const clienteNoMomento = clienteId;
     setSalvandoUnidade(true);
     // Invalida fetches em andamento pra não sobrescrever a lista após o insert.
     const requestId = ++unidadesRequestRef.current;
     const { data, error } = await supabase
       .from('unidades')
       .insert({
-        cliente_id: clienteId,
+        cliente_id: clienteNoMomento,
         nome: novaUnidadeNome.trim(),
         endereco: novaUnidadeEndereco.trim() || null,
       })
-      .select('id, nome, endereco')
+      .select('id, nome, endereco, cliente_id')
       .single();
     setSalvandoUnidade(false);
 
@@ -288,11 +371,13 @@ export default function NovaOS({ onBack, onCriada }) {
     }
 
     if (requestId !== unidadesRequestRef.current) return;
+    if (clienteIdRef.current !== clienteNoMomento) return;
 
     setUnidades((prev) => {
       const semDuplicata = prev.filter((u) => u.id !== data.id);
       return [...semDuplicata, data].sort((a, b) => a.nome.localeCompare(b.nome));
     });
+    unidadeIdRef.current = data.id;
     setUnidadeId(data.id);
     setUnidadeSelecionadaInfo(data);
     setNovaUnidadeNome('');
@@ -306,10 +391,9 @@ export default function NovaOS({ onBack, onCriada }) {
       return;
     }
 
-    const filtrosValidos = novosFiltros.filter((f) => f.numero_peca?.trim());
-    const filtrosInvalidos = novosFiltros.some((f) => !f.numero_peca?.trim());
-    if (filtrosInvalidos) {
-      avisar('Preencha o nº da peça em todos os filtros ou remova a linha vazia.', 'Filtros incompletos');
+    const filtrosCheck = validarFiltrosForm(novosFiltros);
+    if (!filtrosCheck.ok) {
+      avisar(filtrosCheck.mensagem, 'Filtros incompletos');
       return;
     }
 
@@ -319,25 +403,9 @@ export default function NovaOS({ onBack, onCriada }) {
       .from('equipamentos')
       .insert({
         unidade_id: unidadeId,
-        tag: novoEquipamento.tag.trim(),
-        fabricante_gmg: novoEquipamento.fabricante_gmg?.trim() || null,
-        potencia_kva: novoEquipamento.potencia_kva ? Number(novoEquipamento.potencia_kva) : null,
-        tensao: novoEquipamento.tensao?.trim() || null,
-        tipo_gmg: novoEquipamento.tipo_gmg?.trim() || null,
-        n_serie_gmg: novoEquipamento.n_serie_gmg?.trim() || null,
-        ano_fabricacao: novoEquipamento.ano_fabricacao ? Number(novoEquipamento.ano_fabricacao) : null,
-        fabricante_motor: novoEquipamento.fabricante_motor?.trim() || null,
-        modelo_motor: novoEquipamento.modelo_motor?.trim() || null,
-        n_serie_motor: novoEquipamento.n_serie_motor?.trim() || null,
-        placa_motor: novoEquipamento.placa_motor?.trim() || null,
-        fabricante_alternador: novoEquipamento.fabricante_alternador?.trim() || null,
-        modelo_alternador: novoEquipamento.modelo_alternador?.trim() || null,
-        n_serie_alternador: novoEquipamento.n_serie_alternador?.trim() || null,
-        placa_alternador: novoEquipamento.placa_alternador?.trim() || null,
-        data_inicio_contrato: novoEquipamento.data_inicio_contrato?.trim() || null,
-        periodicidade_manutencao: novoEquipamento.periodicidade_manutencao?.trim() || null,
+        ...payloadFromValores(novoEquipamento),
       })
-      .select('id, tag, fabricante_gmg, periodicidade_manutencao')
+      .select(EQUIPAMENTO_LISTA_SELECT)
       .single();
 
     if (error) {
@@ -347,14 +415,15 @@ export default function NovaOS({ onBack, onCriada }) {
       return;
     }
 
-    if (filtrosValidos.length > 0) {
-      const linhasFiltros = filtrosValidos.map((f) => ({
-        equipamento_id: data.id,
-        tipo_filtro: f.tipo_filtro,
-        numero_peca: f.numero_peca.trim(),
-        observacao: f.observacao?.trim() || null,
-      }));
-      const { error: erroFiltros } = await supabase.from('equipamento_filtros').insert(linhasFiltros);
+    if (filtrosCheck.filtros.length > 0) {
+      const { error: erroFiltros } = await supabase.from('equipamento_filtros').insert(
+        filtrosCheck.filtros.map((f) => ({
+          equipamento_id: data.id,
+          tipo_filtro: f.tipo_filtro,
+          numero_peca: f.numero_peca,
+          observacao: f.observacao,
+        }))
+      );
       if (erroFiltros) {
         setSalvandoEquipamento(false);
         avisar(erroFiltros.message, 'Gerador salvo, mas filtros não foram gravados');
@@ -366,25 +435,7 @@ export default function NovaOS({ onBack, onCriada }) {
 
     setEquipamentos((prev) => [...prev, data]);
     setEquipamentosSelecionados((prev) => ({ ...prev, [data.id]: true }));
-    setNovoEquipamento({
-      tag: '',
-      fabricante_gmg: '',
-      potencia_kva: '',
-      tensao: '',
-      tipo_gmg: '',
-      n_serie_gmg: '',
-      ano_fabricacao: '',
-      fabricante_motor: '',
-      modelo_motor: '',
-      n_serie_motor: '',
-      placa_motor: '',
-      fabricante_alternador: '',
-      modelo_alternador: '',
-      n_serie_alternador: '',
-      placa_alternador: '',
-      data_inicio_contrato: '',
-      periodicidade_manutencao: '',
-    });
+    setNovoEquipamento({ ...EQUIPAMENTO_FORM_VAZIO });
     setNovosFiltros([]);
     setMostrarNovoEquipamento(false);
   }
@@ -542,6 +593,7 @@ export default function NovaOS({ onBack, onCriada }) {
                     key={u.id}
                     style={[styles.itemLista, unidadeId === u.id && styles.itemListaSelecionado]}
                     onPress={() => {
+                      unidadeIdRef.current = u.id;
                       setUnidadeId(u.id);
                       setUnidadeSelecionadaInfo(u);
                     }}
@@ -637,36 +689,22 @@ export default function NovaOS({ onBack, onCriada }) {
 
                 {equipamentoEditandoId === e.id ? (
                   <View style={styles.novoEquipamentoForm}>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        { borderColor: cores.bordaInput, color: cores.texto, backgroundColor: cores.fundoCard },
-                      ]}
-                      placeholder="Identificação (ex: GMG 03) *"
-                      value={edTag}
-                      onChangeText={setEdTag}
-                    />
-                    <Text style={[styles.labelPequeno, { color: cores.texto }]}>Periodicidade de manutenção</Text>
-                    <View style={styles.tipoRow}>
-                      {PERIODICIDADES_MANUTENCAO.map((p) => {
-                        const selecionado = edPeriodicidade === p.valor;
-                        return (
-                          <TouchableOpacity
-                            key={p.valor}
-                            style={[styles.tipoButton, selecionado && styles.tipoButtonSelecionado]}
-                            onPress={() => setEdPeriodicidade(selecionado ? '' : p.valor)}
-                          >
-                            <Text style={selecionado ? styles.tipoTextoSelecionado : styles.tipoTexto}>
-                              {p.rotulo}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
+                    {carregandoEdicaoEquipamento ? (
+                      <Text style={[styles.avisoVazio, { color: cores.textoSuave }]}>
+                        Carregando dados do gerador...
+                      </Text>
+                    ) : (
+                      <FormularioEquipamento
+                        valores={edicaoEquipamento}
+                        onChange={alterarEdicaoEquipamento}
+                        filtros={edicaoFiltros}
+                        onChangeFiltros={setEdicaoFiltros}
+                      />
+                    )}
                     <View style={styles.linhaBotoesEdicao}>
                       <TouchableOpacity
                         style={styles.cancelarEdicaoBotao}
-                        onPress={() => setEquipamentoEditandoId(null)}
+                        onPress={fecharEdicaoEquipamento}
                       >
                         <Text style={styles.cancelarEdicaoBotaoTexto}>Cancelar</Text>
                       </TouchableOpacity>
@@ -674,7 +712,7 @@ export default function NovaOS({ onBack, onCriada }) {
                         <Button
                           title={salvandoEdicaoEquipamento ? 'Salvando...' : 'Salvar gerador'}
                           onPress={salvarEdicaoEquipamento}
-                          disabled={salvandoEdicaoEquipamento}
+                          disabled={salvandoEdicaoEquipamento || carregandoEdicaoEquipamento}
                         />
                       </View>
                     </View>
@@ -722,7 +760,10 @@ export default function NovaOS({ onBack, onCriada }) {
           ) : (
             <TouchableOpacity
               style={styles.novoEquipamentoBotao}
-              onPress={() => setMostrarNovoEquipamento(true)}
+              onPress={() => {
+                fecharEdicaoEquipamento();
+                setMostrarNovoEquipamento(true);
+              }}
             >
               <Text style={styles.novoEquipamentoBotaoTexto}>+ Cadastrar novo gerador</Text>
             </TouchableOpacity>

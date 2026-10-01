@@ -17,10 +17,10 @@ export const TEMAS = {
     textoSuave: '#64748B',
     borda: '#E5E9F0',
     bordaInput: '#CBD5E1',
-    primario: '#2F55E8',
-    primarioHover: '#2543C4',
-    primarioFundo: '#EEF2FF',
-    primarioTexto: '#2440C4',
+    primario: '#1E8CFF',
+    primarioHover: '#1570D4',
+    primarioFundo: '#E8F3FF',
+    primarioTexto: '#0F5FB8',
     sobrePrimario: '#FFFFFF',
     sucesso: '#15803D',
     sucessoFundo: '#DCFCE7',
@@ -28,13 +28,13 @@ export const TEMAS = {
     alertaFundo: '#FEF3C7',
     erro: '#DC2626',
     erroFundo: '#FEE2E2',
-    info: '#2563EB',
-    infoFundo: '#DBEAFE',
+    info: '#1E8CFF',
+    infoFundo: '#E8F3FF',
     overlay: 'rgba(15,23,42,0.45)',
     placeholder: '#94A3B8',
-    chipTipoFundo: '#EEF2FF',
+    chipTipoFundo: '#E8F3FF',
     chipEquipFundo: '#EEF1F6',
-    foco: 'rgba(47,85,232,0.35)',
+    foco: 'rgba(30,140,255,0.35)',
   },
   escuro: {
     fundo: '#0B1120',
@@ -45,10 +45,10 @@ export const TEMAS = {
     textoSuave: '#8492A6',
     borda: '#23304A',
     bordaInput: '#34435F',
-    primario: '#7C97FF',
-    primarioHover: '#9BB0FF',
-    primarioFundo: '#1B2547',
-    primarioTexto: '#B4C3FF',
+    primario: '#5BAEFF',
+    primarioHover: '#84C3FF',
+    primarioFundo: '#0F2A4A',
+    primarioTexto: '#A8D4FF',
     sobrePrimario: '#0B1120',
     sucesso: '#4ADE80',
     sucessoFundo: '#14301F',
@@ -56,18 +56,18 @@ export const TEMAS = {
     alertaFundo: '#3A2A0B',
     erro: '#F87171',
     erroFundo: '#3B1616',
-    info: '#60A5FA',
-    infoFundo: '#16294A',
+    info: '#5BAEFF',
+    infoFundo: '#0F2A4A',
     overlay: 'rgba(0,0,0,0.6)',
     placeholder: '#64748B',
-    chipTipoFundo: '#1B2547',
+    chipTipoFundo: '#0F2A4A',
     chipEquipFundo: '#182238',
-    foco: 'rgba(124,151,255,0.45)',
+    foco: 'rgba(91,174,255,0.45)',
   },
 };
 
-// Cor de marca estática, para StyleSheets que não acessam o tema (equivale a cores.primario no claro).
-export const COR_MARCA = '#2F55E8';
+// Cor de marca estática (Genforce Manutenções — alinhada a lib/brand.js).
+export const COR_MARCA = '#1E8CFF';
 
 // Escalas não-cromáticas (iguais nos dois temas).
 export const RAIO = { sm: 8, md: 12, lg: 16, pill: 999 };
@@ -88,6 +88,28 @@ export const SOMBRA = {
   lg: '0 12px 32px rgba(15,23,42,0.16), 0 2px 6px rgba(15,23,42,0.08)',
 };
 
+/**
+ * Alinha status bar / nav chrome do PWA e o fundo de html/body/#root
+ * com a cor do app (evita faixas azul/preta no Android standalone).
+ */
+export function aplicarChromeWeb(corFundo) {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+  const cor = corFundo || TEMAS.claro.fundo;
+
+  let meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.setAttribute('name', 'theme-color');
+    document.head.appendChild(meta);
+  }
+  meta.setAttribute('content', cor);
+
+  document.documentElement.style.backgroundColor = cor;
+  if (document.body) document.body.style.backgroundColor = cor;
+  const root = document.getElementById('root');
+  if (root) root.style.backgroundColor = cor;
+}
+
 const TemaContext = createContext(null);
 
 // Web: carrega a Inter e define estilos globais (foco visível, números tabulares).
@@ -105,7 +127,7 @@ function instalarEstilosGlobaisWeb() {
     html, body { font-family: ${FONTE.familia}; -webkit-font-smoothing: antialiased; }
     body { font-variant-numeric: tabular-nums; }
     [role="button"]:focus-visible, button:focus-visible, a:focus-visible, input:focus-visible,
-    textarea:focus-visible, [tabindex]:focus-visible { outline: 2px solid #2F55E8; outline-offset: 2px; }
+    textarea:focus-visible, [tabindex]:focus-visible { outline: 2px solid #1E8CFF; outline-offset: 2px; }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
   `;
   document.head.appendChild(estilo);
@@ -140,6 +162,7 @@ export function TemaProvider({ children }) {
       carregado,
       cores: modoEscuro ? TEMAS.escuro : TEMAS.claro,
       alternarTema,
+      aplicarChromeWeb,
     }),
     [modoEscuro, carregado]
   );
