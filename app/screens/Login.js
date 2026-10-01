@@ -9,20 +9,23 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useTema } from '../lib/tema';
 import { BRAND } from '../lib/brand';
 
 const FOTO_CAPA = require('../assets-login/foto-geradores-capa.jpg');
 const LOGO = require('../assets-login/genforce-logo-manutencoes-branca.png');
 
-const GRADIENTE_WEB =
-  'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.04) 45%, rgba(0,0,0,0.32) 100%)';
+// Overlay #0B0D12: 85% no topo (atrás da logo) → 45% embaixo (foto ainda aparece)
+const OVERLAY_TOP = 0.85;
+const OVERLAY_BOTTOM = 0.45;
+const OVERLAY_RGB = '11,13,18'; // #0B0D12
+
+const GRADIENTE_WEB = `linear-gradient(180deg, rgba(${OVERLAY_RGB},${OVERLAY_TOP}) 0%, rgba(${OVERLAY_RGB},0.68) 42%, rgba(${OVERLAY_RGB},${OVERLAY_BOTTOM}) 100%)`;
 
 const GRADIENTE_FATIAS = 48;
-const GRADIENTE_MAX = 0.34;
 
 function opacidadeGradiente(t) {
-  return t * t * GRADIENTE_MAX;
+  // t=0 topo → t=1 base
+  return OVERLAY_TOP + (OVERLAY_BOTTOM - OVERLAY_TOP) * t;
 }
 
 function OverlayGradiente() {
@@ -42,7 +45,7 @@ function OverlayGradiente() {
               {
                 top: `${(i / GRADIENTE_FATIAS) * 100}%`,
                 height: `${100 / GRADIENTE_FATIAS}%`,
-                backgroundColor: `rgba(0,0,0,${opacidadeGradiente(t)})`,
+                backgroundColor: `rgba(${OVERLAY_RGB},${opacidadeGradiente(t)})`,
               },
             ]}
           />
@@ -61,7 +64,6 @@ export default function Login({
   loading,
   errorMsg,
 }) {
-  const { modoEscuro } = useTema();
   const zoom = useRef(new Animated.Value(1.06)).current;
   const fade = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(36)).current;
@@ -131,20 +133,18 @@ export default function Login({
           <Text style={styles.botaoEntrarTexto}>{loading ? 'Entrando...' : 'Entrar'}</Text>
         </TouchableOpacity>
 
-        <Text style={[styles.temaAviso, { color: modoEscuro ? '#ddd' : '#fff' }]}>
-          Genforce Engenharia
-        </Text>
+        <Text style={styles.temaAviso}>Genforce Engenharia</Text>
       </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: '#000', overflow: 'hidden' },
+  tela: { flex: 1, backgroundColor: BRAND.fundo, overflow: 'hidden' },
   fundoWrap: {
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
-    backgroundColor: '#000',
+    backgroundColor: BRAND.fundo,
   },
   fundo: {
     position: 'absolute',
@@ -176,14 +176,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     paddingTop: 72,
     alignItems: 'center',
+    zIndex: 1,
   },
   logoWrap: {
     marginBottom: 36,
     alignItems: 'center',
     width: 280,
     maxWidth: '100%',
+    backgroundColor: 'transparent',
   },
-  logoImg: { width: 244, height: 122 },
+  logoImg: {
+    width: 244,
+    height: 122,
+    // Sombra suave #0B0D12 ~60%, blur 14px, sem deslocamento
+    ...(Platform.OS === 'web'
+      ? { filter: 'drop-shadow(0 0 14px rgba(11,13,18,0.60))' }
+      : {
+          shadowColor: BRAND.fundo,
+          shadowOpacity: 0.6,
+          shadowRadius: 14,
+          shadowOffset: { width: 0, height: 0 },
+        }),
+  },
   pilula: {
     width: '100%',
     maxWidth: 420,
@@ -209,5 +223,13 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   botaoEntrarTexto: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  temaAviso: { marginTop: 18, fontSize: 12, opacity: 0.85 },
+  temaAviso: {
+    marginTop: 18,
+    fontSize: 12,
+    color: BRAND.branco,
+    opacity: 0.95,
+    textShadowColor: 'rgba(11,13,18,0.75)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
+  },
 });
