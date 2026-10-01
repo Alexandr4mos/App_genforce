@@ -10,7 +10,7 @@
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#ffffff",
-  "theme_color": "#003399",
+  "theme_color": "#ffffff",
   "categories": ["business", "productivity"],
   "icons": [
     {

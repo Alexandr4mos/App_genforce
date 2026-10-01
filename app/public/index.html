@@ -9,28 +9,41 @@
     />
     <title>Genforce Manutenções</title>
     <meta name="description" content="Ordens de serviço e manutenção de geradores — Genforce Energia" />
-    <meta name="theme-color" content="#003399" />
+    <!-- Acompanham o tema via JS (aplicarChromeWeb); valor inicial = tema claro -->
+    <meta name="theme-color" content="#ffffff" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Genforce" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
     <style>
-      /* Evita flash branco e estica o wrapper RN Web na altura da tela */
+      /* Preenche a tela no PWA standalone (incl. safe areas no Android/iOS) */
       html,
       body,
       #root {
         height: 100%;
+        min-height: 100%;
+        min-height: 100dvh;
+      }
+      html {
+        background-color: #ffffff;
+      }
+      body {
+        margin: 0;
+        background-color: #ffffff;
       }
       #root {
         display: flex;
         flex-direction: column;
-      }
-      body {
-        margin: 0;
-        background: #ffffff;
+        box-sizing: border-box;
+        background-color: #ffffff;
+        /* Fundo do app (não preto/azul do sistema) preenche notch, status e nav */
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-right: env(safe-area-inset-right, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        padding-left: env(safe-area-inset-left, 0px);
       }
     </style>
   </head>

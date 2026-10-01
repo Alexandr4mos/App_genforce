@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const CHAVE_TEMA = '@genforce/modo_escuro';
@@ -42,6 +43,28 @@ export const TEMAS = {
   },
 };
 
+/**
+ * Alinha status bar / nav chrome do PWA e o fundo de html/body/#root
+ * com a cor do app (evita faixas azul/preta no Android standalone).
+ */
+export function aplicarChromeWeb(corFundo) {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+  const cor = corFundo || TEMAS.claro.fundo;
+
+  let meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.setAttribute('name', 'theme-color');
+    document.head.appendChild(meta);
+  }
+  meta.setAttribute('content', cor);
+
+  document.documentElement.style.backgroundColor = cor;
+  if (document.body) document.body.style.backgroundColor = cor;
+  const root = document.getElementById('root');
+  if (root) root.style.backgroundColor = cor;
+}
+
 const TemaContext = createContext(null);
 
 export function TemaProvider({ children }) {
@@ -72,6 +95,7 @@ export function TemaProvider({ children }) {
       carregado,
       cores: modoEscuro ? TEMAS.escuro : TEMAS.claro,
       alternarTema,
+      aplicarChromeWeb,
     }),
     [modoEscuro, carregado]
   );

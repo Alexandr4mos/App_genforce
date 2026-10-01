@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from './lib/supabase';
 import { emailAuthDeLogin, sairComRetry } from './lib/auth';
-import { TemaProvider, useTema } from './lib/tema';
+import { TemaProvider, useTema, TEMAS, aplicarChromeWeb } from './lib/tema';
 import { FiltroOSProvider, useFiltroOS } from './lib/filtroOS';
 import OSDetail from './screens/OSDetail';
 import NovaOS from './screens/NovaOS';
@@ -53,6 +53,12 @@ function AppInterno() {
     });
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  // PWA Android: status bar / fundo do shell acompanham o tema (ou preto no login).
+  useEffect(() => {
+    const cor = !session ? '#000000' : modoEscuro ? TEMAS.escuro.fundo : TEMAS.claro.fundo;
+    aplicarChromeWeb(cor);
+  }, [session, modoEscuro]);
 
   async function handleLogin() {
     setLoading(true);
