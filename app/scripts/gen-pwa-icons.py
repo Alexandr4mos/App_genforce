@@ -7,7 +7,8 @@ SOURCE = ROOT / "assets-login" / "genforce-app-icon-source.jpg"
 OUT = ROOT / "public" / "icons"
 OUT.mkdir(parents=True, exist_ok=True)
 
-BLACK = (0, 0, 0)
+# Fundo da marca (maskable / letterbox)
+BRAND_BG = (0x0B, 0x0D, 0x12)
 
 
 def load_source() -> Image.Image:
@@ -27,11 +28,11 @@ def resize_cover(im: Image.Image, size: int) -> Image.Image:
 def resize_maskable(im: Image.Image, size: int, safe_ratio: float = 0.8) -> Image.Image:
     """
     Coloca o ícone no centro com margem de segurança (~80% do canvas),
-    fundo preto sólido — Android corta cantos no purpose=maskable.
+    fundo da marca — Android corta cantos no purpose=maskable.
     """
     content = int(size * safe_ratio)
     resized = im.resize((content, content), Image.Resampling.LANCZOS)
-    canvas = Image.new("RGB", (size, size), BLACK)
+    canvas = Image.new("RGB", (size, size), BRAND_BG)
     offset = (size - content) // 2
     canvas.paste(resized, (offset, offset))
     return canvas

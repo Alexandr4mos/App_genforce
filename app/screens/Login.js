@@ -10,9 +10,10 @@ import {
   View,
 } from 'react-native';
 import { useTema } from '../lib/tema';
+import { BRAND } from '../lib/brand';
 
 const FOTO_CAPA = require('../assets-login/foto-geradores-capa.jpg');
-const LOGO = require('../assets-login/genforce-logo-transparente.png');
+const LOGO = require('../assets-login/genforce-logo-manutencoes-branca.png');
 
 const GRADIENTE_WEB =
   'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.04) 45%, rgba(0,0,0,0.32) 100%)';
@@ -60,7 +61,7 @@ export default function Login({
   loading,
   errorMsg,
 }) {
-  const { cores, modoEscuro } = useTema();
+  const { modoEscuro } = useTema();
   const zoom = useRef(new Animated.Value(1.06)).current;
   const fade = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(36)).current;
@@ -98,11 +99,8 @@ export default function Login({
           { opacity: fade, transform: [{ translateY: slide }] },
         ]}
       >
-        <View style={styles.logoCaixa}>
-          <View style={styles.logoClip}>
-            <Image source={LOGO} style={styles.logoImg} resizeMode="contain" />
-          </View>
-          <Text style={styles.logoSub}>MANUTENÇÃO</Text>
+        <View style={styles.logoWrap}>
+          <Image source={LOGO} style={styles.logoImg} resizeMode="contain" />
         </View>
 
         <TextInput
@@ -126,7 +124,7 @@ export default function Login({
         {errorMsg ? <Text style={styles.erro}>{errorMsg}</Text> : null}
 
         <TouchableOpacity
-          style={[styles.botaoEntrar, { backgroundColor: cores.primario }]}
+          style={[styles.botaoEntrar, { backgroundColor: BRAND.destaque }]}
           onPress={onEntrar}
           disabled={loading}
         >
@@ -179,32 +177,13 @@ const styles = StyleSheet.create({
     paddingTop: 72,
     alignItems: 'center',
   },
-  logoCaixa: {
-    backgroundColor: 'rgba(8,8,8,0.88)',
-    borderRadius: 12,
-    paddingTop: 16,
-    paddingBottom: 14,
-    paddingHorizontal: 22,
+  logoWrap: {
     marginBottom: 36,
-    overflow: 'hidden',
     alignItems: 'center',
     width: 280,
     maxWidth: '100%',
   },
-  logoClip: {
-    height: 52,
-    width: 230,
-    overflow: 'hidden',
-    alignItems: 'center',
-  },
-  logoImg: { width: 230, height: 86, marginTop: -4 },
-  logoSub: {
-    marginTop: 6,
-    color: '#3d6fd4',
-    fontSize: 12,
-    letterSpacing: 4.2,
-    fontWeight: '600',
-  },
+  logoImg: { width: 244, height: 122 },
   pilula: {
     width: '100%',
     maxWidth: 420,
