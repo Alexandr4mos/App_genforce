@@ -9,7 +9,6 @@
     />
     <title>Genforce Manutenções</title>
     <meta name="description" content="Ordens de serviço e manutenção de geradores — Genforce Energia" />
-    <!-- Splash / chrome inicial = fundo da marca; runtime pode sobrescrever via aplicarChromeWeb -->
     <meta name="theme-color" content="#0B0D12" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -19,7 +18,6 @@
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
     <style>
-      /* Preenche a tela no PWA standalone (incl. safe areas no Android/iOS) */
       html,
       body,
       #root {
@@ -39,17 +37,39 @@
         flex-direction: column;
         box-sizing: border-box;
         background-color: #0B0D12;
-        /* Fundo do app preenche notch, status e nav */
         padding-top: env(safe-area-inset-top, 0px);
         padding-right: env(safe-area-inset-right, 0px);
         padding-bottom: env(safe-area-inset-bottom, 0px);
         padding-left: env(safe-area-inset-left, 0px);
       }
+      /* Primeiro paint: evita tela vazia até o React montar a splash */
+      #splash-boot {
+        position: fixed;
+        inset: 0;
+        z-index: 100000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #0B0D12;
+        pointer-events: none;
+      }
+      #splash-boot img {
+        width: 30vw;
+        max-width: 180px;
+        min-width: 96px;
+        height: auto;
+        aspect-ratio: 1;
+        border-radius: 22%;
+        object-fit: cover;
+        background: #0B0D12;
+      }
     </style>
   </head>
   <body>
     <noscript>É necessário habilitar JavaScript para usar o Genforce Manutenções.</noscript>
-    <!-- Expo SPA root (Metro injeta o bundle) -->
+    <div id="splash-boot" aria-hidden="true">
+      <img src="/icons/icon-192.png" alt="" width="192" height="192" />
+    </div>
     <div id="root"></div>
     <script>
       if ('serviceWorker' in navigator) {
@@ -57,14 +77,12 @@
           navigator.serviceWorker
             .register('/sw.js')
             .then(function (registration) {
-              // Busca atualização em cada visita (deploy novo no Vercel)
               registration.update().catch(function () {});
               registration.addEventListener('updatefound', function () {
                 var novo = registration.installing;
                 if (!novo) return;
                 novo.addEventListener('statechange', function () {
                   if (novo.state === 'installed' && navigator.serviceWorker.controller) {
-                    // Nova versão pronta — ativa na próxima abertura (skipWaiting no SW)
                     console.log('[PWA] Nova versão disponível');
                   }
                 });

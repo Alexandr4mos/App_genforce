@@ -25,10 +25,9 @@ def resize_cover(im: Image.Image, size: int) -> Image.Image:
     return im.resize((size, size), Image.Resampling.LANCZOS)
 
 
-def resize_maskable(im: Image.Image, size: int, safe_ratio: float = 0.8) -> Image.Image:
+def resize_maskable(im: Image.Image, size: int, safe_ratio: float = 0.6) -> Image.Image:
     """
-    Coloca o ícone no centro com margem de segurança (~80% do canvas),
-    fundo da marca — Android corta cantos no purpose=maskable.
+    Canvas 100% #0B0D12; G nos 60% centrais (safe zone maskable Android).
     """
     content = int(size * safe_ratio)
     resized = im.resize((content, content), Image.Resampling.LANCZOS)
