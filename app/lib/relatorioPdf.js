@@ -103,6 +103,27 @@ function blocoEquipamento(eq) {
   </section>`;
 }
 
+function blocoFotosItem(fotos) {
+  const lista = (fotos || []).filter((f) => f?.url);
+  if (!lista.length) return '';
+  const figs = lista
+    .map((f) => {
+      const legenda = f.legenda?.trim()
+        ? `<figcaption class="item-foto-legenda">${escHtml(f.legenda.trim())}</figcaption>`
+        : '';
+      return `<figure class="item-foto">
+        <img
+          src="${escHtml(f.url)}"
+          alt="${escHtml(f.legenda || 'Evidência do checklist')}"
+          crossorigin="anonymous"
+        />
+        ${legenda}
+      </figure>`;
+    })
+    .join('');
+  return `<div class="item-fotos">${figs}</div>`;
+}
+
 function blocoChecklist(eq, respostas) {
   const grupos = agruparRespostasPorGrupo(respostas);
   if (!grupos.length) {
@@ -117,10 +138,12 @@ function blocoChecklist(eq, respostas) {
           const obs = r.observacao
             ? `<div class="item-obs">${escHtml(r.observacao)}</div>`
             : '';
+          const fotos = blocoFotosItem(r.fotos);
           return `<div class="check-item">
             <div class="check-titulo">${escHtml(titulo)}</div>
             <div class="check-resposta">${escHtml(r.resposta || '—')}</div>
             ${obs}
+            ${fotos}
           </div>`;
         })
         .join('');
@@ -175,9 +198,22 @@ export async function abrirRelatorioParaImpressao(osId) {
     (osEq || []).map(async (eq) => {
       const { data: respostas } = await supabase
         .from('checklist_respostas')
-        .select('resposta, observacao, checklist_template_itens(titulo, grupo, ordem)')
+        .select(
+          `id, resposta, observacao,
+          checklist_template_itens(titulo, grupo, ordem),
+          fotos(id, url, legenda, criado_em)`
+        )
         .eq('os_equipamento_id', eq.id);
-      checklistsPorEq[eq.id] = respostas || [];
+      // Ordena fotos por criação (mais antigas primeiro) dentro de cada item.
+      const comFotos = (respostas || []).map((r) => ({
+        ...r,
+        fotos: [...(r.fotos || [])].sort((a, b) => {
+          const ta = a.criado_em ? new Date(a.criado_em).getTime() : 0;
+          const tb = b.criado_em ? new Date(b.criado_em).getTime() : 0;
+          return ta - tb;
+        }),
+      }));
+      checklistsPorEq[eq.id] = comFotos;
     })
   );
 
@@ -362,6 +398,35 @@ export async function abrirRelatorioParaImpressao(osId) {
     .check-titulo { font-weight: 600; }
     .check-resposta { color: #0b3d91; font-weight: 600; text-align: right; }
     .item-obs { grid-column: 1 / -1; color: var(--muted); font-size: 12px; font-style: italic; }
+    .item-fotos {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .item-foto {
+      margin: 0;
+      width: calc(50% - 5px);
+      max-width: 280px;
+      border: 1px solid var(--borda);
+      border-radius: 6px;
+      overflow: hidden;
+      background: #fff;
+      page-break-inside: avoid;
+    }
+    .item-foto img {
+      display: block;
+      width: 100%;
+      max-height: 220px;
+      object-fit: contain;
+      background: #f5f7fb;
+    }
+    .item-foto-legenda {
+      padding: 4px 8px;
+      font-size: 11px;
+      color: var(--muted);
+    }
     .tabela { width: 100%; border-collapse: collapse; font-size: 13px; }
     .tabela th, .tabela td { border: 1px solid var(--borda); padding: 8px; text-align: left; }
     .tabela th { background: var(--azul-claro); color: var(--azul); }
@@ -409,6 +474,7 @@ export async function abrirRelatorioParaImpressao(osId) {
     @media (max-width: 700px) {
       .grid-info, .assinaturas, .check-item { grid-template-columns: 1fr; }
       .check-resposta { text-align: left; }
+      .item-foto { width: 100%; max-width: none; }
       .cabecalho { flex-direction: column; }
       .meta-os { text-align: left; }
     }
@@ -490,17 +556,30 @@ export async function abrirRelatorioParaImpressao(osId) {
         botao.disabled = true;
         botao.textContent = 'Gerando PDF...';
         var el = document.getElementById('relatorio');
-        html2pdf()
-          .set({
-            margin: [10, 10, 12, 10],
-            filename: 'OS-${String(os.numero).replace(/'/g, '')}-Genforce.pdf',
-            image: { type: 'jpeg', quality: 0.96 },
-            html2canvas: { scale: 2, useCORS: true, logging: false },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-            pagebreak: { mode: ['css', 'legacy'] }
+        // Garante que as evidências (fotos) terminaram de carregar antes do html2canvas.
+        var imgs = Array.prototype.slice.call(el.querySelectorAll('img'));
+        Promise.all(
+          imgs.map(function (img) {
+            if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+            return new Promise(function (resolve) {
+              img.onload = resolve;
+              img.onerror = resolve;
+              setTimeout(resolve, 4000);
+            });
           })
-          .from(el)
-          .save()
+        ).then(function () {
+          return html2pdf()
+            .set({
+              margin: [10, 10, 12, 10],
+              filename: 'OS-${String(os.numero).replace(/'/g, '')}-Genforce.pdf',
+              image: { type: 'jpeg', quality: 0.92 },
+              html2canvas: { scale: 2, useCORS: true, allowTaint: false, logging: false },
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+              pagebreak: { mode: ['css', 'legacy'] }
+            })
+            .from(el)
+            .save();
+        })
           .then(function () {
             botao.disabled = false;
             botao.textContent = 'Baixar PDF';
