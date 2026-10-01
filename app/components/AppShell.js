@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
 import { useTema, RAIO, SOMBRA, LARGURA_DESKTOP, ALVO_TOQUE } from '../lib/tema';
 import Icone from './ui/Icone';
 
-const LOGO = require('../assets-login/genforce-logo-transparente.png');
-
 // Estrutura de navegação: sidebar fixa no desktop, barra inferior + "Mais" no mobile.
 // `itens`: [{ id, rotulo, icone, onPress, principal }] — principal = aparece na barra inferior.
+// Logo de marca fica no AppHeader (topo), não aqui.
 export default function AppShell({ itens, secaoAtiva, onSair, children }) {
   const { cores, modoEscuro, alternarTema } = useTema();
   const { width } = useWindowDimensions();
@@ -21,13 +20,7 @@ export default function AppShell({ itens, secaoAtiva, onSair, children }) {
     return (
       <View style={[styles.raiz, { backgroundColor: cores.fundo, flexDirection: 'row' }]}>
         <View style={[styles.sidebar, { backgroundColor: cores.fundoCard, borderRightColor: cores.borda }]}>
-          <Image
-            source={LOGO}
-            resizeMode="contain"
-            accessibilityLabel="Genforce Energia"
-            style={[styles.logo, modoEscuro && { tintColor: '#FFFFFF' }]}
-          />
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 2 }}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 2, paddingTop: 8 }}>
             {itens.map((item) => (
               <ItemNav key={item.id} item={item} ativo={item.id === secaoAtiva} />
             ))}
@@ -166,8 +159,7 @@ function AbaInferior({ item, ativo }) {
 const styles = StyleSheet.create({
   raiz: { flex: 1 },
   conteudo: { flex: 1, minWidth: 0 },
-  sidebar: { width: 248, borderRightWidth: 1, paddingHorizontal: 12, paddingTop: 20, paddingBottom: 12 },
-  logo: { width: 132, height: 45, marginLeft: 8, marginBottom: 24 },
+  sidebar: { width: 248, borderRightWidth: 1, paddingHorizontal: 12, paddingTop: 8, paddingBottom: 12 },
   rodape: { borderTopWidth: 1, paddingTop: 8, marginTop: 8 },
   item: {
     flexDirection: 'row',

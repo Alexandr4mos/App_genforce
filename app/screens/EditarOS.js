@@ -689,7 +689,7 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 40, paddingHorizontal: 20, backgroundColor: '#fff' },
+  container: { flex: 1, paddingTop: 16, paddingHorizontal: 20, backgroundColor: '#fff' },
   backButton: { marginBottom: 10 },
   backText: { color: COR_MARCA, fontSize: 16 },
   title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20 },
