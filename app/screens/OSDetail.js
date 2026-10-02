@@ -132,6 +132,7 @@ export default function OSDetail({ osId, userId, onBack }) {
   const [processandoRevisao, setProcessandoRevisao] = useState(false);
   const [finalizando, setFinalizando] = useState(false);
   const finalizandoRef = useRef(false);
+  const scrollRef = useRef(null);
   const [gruposOpcionais, setGruposOpcionais] = useState(new Set());
 
   const debounceTimers = useRef({});
@@ -1464,6 +1465,7 @@ export default function OSDetail({ osId, userId, onBack }) {
       if (faltando.length > 0) {
         setRelatorioSalvo(false);
         setStatusSalvamento('salvo');
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
         avisar(
           `Salvo, mas ainda faltam ${faltando.length} item(ns) pra completar: ${faltando.slice(0, 3).join(' · ')}`,
           'Relatório incompleto'
@@ -1474,6 +1476,7 @@ export default function OSDetail({ osId, userId, onBack }) {
       if (!observacaoGeralRef.current?.trim()) {
         setRelatorioSalvo(false);
         setStatusSalvamento('salvo');
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
         avisar('Preencha as observações gerais.', 'Relatório incompleto');
         return;
       }
@@ -1481,6 +1484,7 @@ export default function OSDetail({ osId, userId, onBack }) {
       if (!assinaturaClienteRef.current || !assinaturaTecnicoRef.current) {
         setRelatorioSalvo(false);
         setStatusSalvamento('salvo');
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
         avisar('Assinaturas do cliente e do técnico são obrigatórias.', 'Relatório incompleto');
         return;
       }
@@ -1500,12 +1504,14 @@ export default function OSDetail({ osId, userId, onBack }) {
         setOsInfo((prev) => (prev ? { ...prev, status: 'concluida' } : prev));
         setStatusSalvamento('salvo');
         recomputarRelatorioSalvo();
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
         avisar('Relatório corrigido enviado para revisão do supervisor.', 'Sucesso');
         return;
       }
 
       setStatusSalvamento('salvo');
       recomputarRelatorioSalvo();
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
       avisar('Relatório salvo com sucesso! Check-out liberado.', 'Sucesso');
     } catch (err) {
       console.log(err);
@@ -1798,7 +1804,11 @@ export default function OSDetail({ osId, userId, onBack }) {
   }
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: cores.fundo }]} contentContainerStyle={styles.conteudoCentral}>
+    <ScrollView
+      ref={scrollRef}
+      style={[styles.container, { backgroundColor: cores.fundo }]}
+      contentContainerStyle={styles.conteudoCentral}
+    >
       <View style={styles.cabecalhoTopRow}>
         <TouchableOpacity
           accessibilityRole="button"

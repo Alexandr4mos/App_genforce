@@ -46,6 +46,7 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
   const [tiposSelecionados, setTiposSelecionados] = useState({});
   const [prioridade, setPrioridade] = useState('medio');
   const [status, setStatus] = useState('pendente');
+  const [statusOriginal, setStatusOriginal] = useState('pendente');
   const [descricao, setDescricao] = useState('');
   const [dataPrevista, setDataPrevista] = useState('');
   const [salvando, setSalvando] = useState(false);
@@ -112,7 +113,9 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
       return;
     }
 
-    setStatus(os.status || 'pendente');
+    const statusBanco = os.status || 'pendente';
+    setStatus(statusBanco);
+    setStatusOriginal(statusBanco);
     setPrioridade(os.prioridade || 'medio');
     setDescricao(os.descricao || '');
     setUnidadeId(os.unidade_id);
@@ -343,15 +346,30 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
     setSalvando(true);
 
     const dataConvertida = dataPrevista.trim() || null;
+    const statusTravado = statusOriginal === 'finalizado';
+    const STATUS_REABERTURA = ['pendente', 'andamento', 'pausada'];
+    const reabrindoConcluida =
+      !statusTravado &&
+      statusOriginal === 'concluida' &&
+      STATUS_REABERTURA.includes(status);
+
+    const payload = {
+      status: statusTravado ? 'finalizado' : status,
+      descricao: descricao.trim() || null,
+      data_inicio_prevista: dataConvertida,
+      prioridade,
+    };
+
+    // Concluída → Pendente/Andamento/Pausada: desfaz check-out (mantém check-in)
+    if (reabrindoConcluida) {
+      payload.checkout_em = null;
+      payload.checkout_lat = null;
+      payload.checkout_lng = null;
+    }
 
     const { error } = await supabase
       .from('ordens_servico')
-      .update({
-        status,
-        descricao: descricao.trim() || null,
-        data_inicio_prevista: dataConvertida,
-        prioridade,
-      })
+      .update(payload)
       .eq('id', osId);
 
     if (error) {
@@ -527,18 +545,35 @@ export default function EditarOS({ osId, onBack, onSalva, onExcluida }) {
       </View>
 
       <Text style={[styles.label, { color: cores.texto }]}>Status</Text>
+      {statusOriginal === 'finalizado' ? (
+        <Text style={{ marginBottom: 12, fontSize: 13, color: cores.textoSecundario }}>
+          OS finalizada — o status não pode mais ser alterado.
+        </Text>
+      ) : null}
       <View style={styles.tipoRow}>
-        {STATUS_OS.map((s) => (
-          <TouchableOpacity
-            key={s.valor}
-            style={[styles.tipoButton, status === s.valor && styles.tipoButtonSelecionado]}
-            onPress={() => setStatus(s.valor)}
-          >
-            <Text style={status === s.valor ? styles.tipoTextoSelecionado : [styles.tipoTexto, { color: cores.texto }]}>
-              {s.rotulo}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {STATUS_OS.map((s) => {
+          const travado = statusOriginal === 'finalizado';
+          const selecionado = status === s.valor;
+          return (
+            <TouchableOpacity
+              key={s.valor}
+              disabled={travado}
+              style={[
+                styles.tipoButton,
+                selecionado && styles.tipoButtonSelecionado,
+                travado && { opacity: 0.55 },
+              ]}
+              onPress={() => {
+                if (travado) return;
+                setStatus(s.valor);
+              }}
+            >
+              <Text style={selecionado ? styles.tipoTextoSelecionado : [styles.tipoTexto, { color: cores.texto }]}>
+                {s.rotulo}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <Text style={[styles.label, { color: cores.texto }]}>Data prevista da manutenção</Text>
