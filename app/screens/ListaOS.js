@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
+  Platform,
   View,
   Text,
   TextInput,
@@ -52,8 +55,11 @@ export default function ListaOS({
   const [menuAbertoId, setMenuAbertoId] = useState(null);
   const queryIdRef = useRef(0);
   const appliedRangeRef = useRef(dateFilter.appliedRange);
+  const giroRefresh = useRef(new Animated.Value(0)).current;
+  const giroLoopRef = useRef(null);
 
   const privilegiado = ehPrivilegiado(papel);
+
 
   useEffect(() => {
     if (!userId) return;
@@ -64,6 +70,29 @@ export default function ListaOS({
       .single()
       .then(({ data }) => setPapel(data?.papel || 'tecnico'));
   }, [userId]);
+
+  useEffect(() => {
+    if (loading) {
+      giroRefresh.setValue(0);
+      const loop = Animated.loop(
+        Animated.timing(giroRefresh, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.linear,
+          useNativeDriver: Platform.OS !== 'web',
+        })
+      );
+      giroLoopRef.current = loop;
+      loop.start();
+      return () => {
+        loop.stop();
+        giroLoopRef.current = null;
+      };
+    }
+    giroLoopRef.current?.stop();
+    giroLoopRef.current = null;
+    giroRefresh.setValue(0);
+  }, [loading, giroRefresh]);
 
   function tentarCriarOS() {
     if (!privilegiado) {
@@ -202,6 +231,17 @@ export default function ListaOS({
     return copia;
   }, [ordens, busca, filtroStatus, ordenacao]);
 
+  // Sticky nativo da FlatList (índice 0 = período). Em 2 colunas usa fallback CSS sticky.
+  const stickyNativo = colunas === 1;
+  const listData = useMemo(() => {
+    if (!stickyNativo) return loading ? [] : ordensVisiveis;
+    return [
+      { id: '__periodo', __tipo: 'periodo' },
+      { id: '__toolbar', __tipo: 'toolbar' },
+      ...(loading ? [] : ordensVisiveis),
+    ];
+  }, [stickyNativo, loading, ordensVisiveis]);
+
   function chipsEquipamentos(item) {
     return (item.os_equipamentos || [])
       .map((vinculo) => vinculo.equipamentos)
@@ -331,40 +371,68 @@ export default function ListaOS({
   const rotuloOrdenacao = OPCOES_ORDENACAO.find((o) => o.valor === ordenacao)?.rotulo || 'Ordenar';
   const rotuloFiltroStatus = filtroStatus ? rotuloStatus(filtroStatus) : 'Todos os status';
 
-  function renderCabecalho() {
-    return (
-      <View style={{ zIndex: 50 }}>
-        <View style={styles.tituloRow}>
-          <View style={{ flex: 1 }}>
-            <Text accessibilityRole="header" style={[styles.title, { color: cores.texto }]}>
-              Ordens de Serviço
-            </Text>
-            <Text style={[styles.subtitulo, { color: cores.textoSecundario }]}>
-              {loading
-                ? 'Carregando…'
-                : `${ordensVisiveis.length} ${ordensVisiveis.length === 1 ? 'ordem' : 'ordens'} no período`}
-            </Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Atualizar lista"
-            style={({ hovered }) => [
-              styles.iconeBotao,
-              { borderColor: cores.borda, backgroundColor: hovered ? cores.fundoSecundario : cores.fundoCard },
-            ]}
-            onPress={() => fetchOrdens(dateFilter.appliedRange)}
-          >
-            <Icone nome="refresh" tamanho={18} cor={cores.textoSecundario} />
-          </Pressable>
-          {desktop ? <Botao titulo="Nova OS" icone="plus" onPress={tentarCriarOS} /> : null}
-        </View>
+  const contagemTexto = loading
+    ? 'Carregando…'
+    : `${ordensVisiveis.length} ${ordensVisiveis.length === 1 ? 'ordem' : 'ordens'}`;
 
+  function renderPeriodoCard() {
+    const botaoAtualizar = (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Atualizar lista"
+        hitSlop={4}
+        disabled={loading}
+        style={styles.botaoAtualizar}
+        onPress={() => fetchOrdens(dateFilter.appliedRange)}
+      >
+        <Animated.View
+          style={{
+            transform: [
+              {
+                rotate: giroRefresh.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0deg', '360deg'],
+                }),
+              },
+            ],
+          }}
+        >
+          <Icone nome="refresh" tamanho={20} cor={cores.textoSecundario} />
+        </Animated.View>
+      </Pressable>
+    );
+
+    return (
+      <View
+        style={[
+          styles.periodoSticky,
+          {
+            backgroundColor: cores.fundo,
+            marginHorizontal: desktop ? -32 : -16,
+            paddingHorizontal: desktop ? 32 : 16,
+          },
+        ]}
+      >
         <DateRangeFilter
+          compacto
           estado={dateFilter}
           onEstado={setDateFilter}
           onPeriodoAplicado={onPeriodoAplicado}
+          contagemTexto={contagemTexto}
+          direitaExtra={
+            <View style={styles.periodoAcoes}>
+              {botaoAtualizar}
+              {desktop ? <Botao titulo="Nova OS" icone="plus" onPress={tentarCriarOS} /> : null}
+            </View>
+          }
         />
+      </View>
+    );
+  }
 
+  function renderToolbar() {
+    return (
+      <View style={{ zIndex: 50 }}>
         <View style={styles.contadoresRow}>
           {STATUS_OS.map((s) => {
             const ativo = filtroStatus === s.valor;
@@ -432,29 +500,9 @@ export default function ListaOS({
         </View>
 
         {loading ? <SkeletonListaOS quantidade={3} /> : null}
-      </View>
-    );
-  }
 
-  return (
-    <View style={[styles.container, { backgroundColor: cores.fundo }]}>
-      <FlatList
-        key={`colunas-${colunas}`}
-        numColumns={colunas > 1 ? colunas : undefined}
-        columnWrapperStyle={colunas > 1 ? styles.colunasWrap : undefined}
-        style={styles.lista}
-        contentContainerStyle={[styles.listaConteudo, desktop && styles.listaDesktop]}
-        data={loading ? [] : ordensVisiveis}
-        keyExtractor={(item) => String(item.id)}
-        renderItem={renderCard}
-        ListHeaderComponent={renderCabecalho}
-        extraData={{ filtroStatus, busca, ordenacao, cores, dropdownAberto, contadores, menuAbertoId, colunas }}
-        onScrollBeginDrag={() => {
-          setDropdownAberto(null);
-          setMenuAbertoId(null);
-        }}
-        ListEmptyComponent={
-          loading ? null : errorMsg ? (
+        {!loading && ordensVisiveis.length === 0 ? (
+          errorMsg ? (
             <EstadoVazio
               tom="erro"
               icone="alert"
@@ -476,7 +524,58 @@ export default function ListaOS({
               onAcao={filtroStatus || busca ? () => { setFiltroStatus(null); setBusca(''); } : tentarCriarOS}
             />
           )
+        ) : null}
+      </View>
+    );
+  }
+
+  function renderItem({ item }) {
+    if (item.__tipo === 'periodo') return renderPeriodoCard();
+    if (item.__tipo === 'toolbar') return renderToolbar();
+    return renderCard({ item });
+  }
+
+  return (
+    <View style={[styles.container, { backgroundColor: cores.fundo }]}>
+      <FlatList
+        key={`colunas-${colunas}-sticky-${stickyNativo ? 1 : 0}`}
+        numColumns={!stickyNativo && colunas > 1 ? colunas : undefined}
+        columnWrapperStyle={!stickyNativo && colunas > 1 ? styles.colunasWrap : undefined}
+        style={styles.lista}
+        contentContainerStyle={[styles.listaConteudo, desktop && styles.listaDesktop]}
+        data={listData}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={renderItem}
+        stickyHeaderIndices={stickyNativo ? [0] : undefined}
+        ListHeaderComponent={
+          stickyNativo
+            ? null
+            : () => (
+                <View style={{ zIndex: 50 }}>
+                  <View
+                    style={
+                      Platform.OS === 'web'
+                        ? {
+                            position: 'sticky',
+                            top: 0,
+                            zIndex: 40,
+                            backgroundColor: cores.fundo,
+                          }
+                        : { backgroundColor: cores.fundo }
+                    }
+                  >
+                    {renderPeriodoCard()}
+                  </View>
+                  {renderToolbar()}
+                </View>
+              )
         }
+        extraData={{ filtroStatus, busca, ordenacao, cores, dropdownAberto, contadores, menuAbertoId, colunas, loading, errorMsg }}
+        onScrollBeginDrag={() => {
+          setDropdownAberto(null);
+          setMenuAbertoId(null);
+        }}
+        ListEmptyComponent={null}
       />
       {!desktop ? (
         <Pressable
@@ -549,20 +648,20 @@ function SeletorDropdown({ rotulo, aberto, onAlternar, opcoes, valor, onEscolher
 const styles = StyleSheet.create({
   container: { flex: 1 },
   lista: { flex: 1 },
-  listaConteudo: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 96 },
-  listaDesktop: { paddingHorizontal: 32, paddingTop: 32, width: '100%', maxWidth: 1240, alignSelf: 'center' },
-  tituloRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  title: { fontSize: 24, fontWeight: '700', letterSpacing: -0.3 },
-  subtitulo: { fontSize: 14, marginTop: 2 },
-  iconeBotao: {
+  listaConteudo: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 96 },
+  listaDesktop: { paddingHorizontal: 32, paddingTop: 16, width: '100%', maxWidth: 1240, alignSelf: 'center' },
+  periodoSticky: {
+    zIndex: 40,
+    paddingBottom: 8,
+  },
+  periodoAcoes: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  botaoAtualizar: {
     width: ALVO_TOQUE,
     height: ALVO_TOQUE,
-    borderRadius: RAIO.md,
-    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  contadoresRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 12 },
+  contadoresRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4, marginBottom: 12 },
   contadorChip: {
     flexDirection: 'row',
     alignItems: 'center',

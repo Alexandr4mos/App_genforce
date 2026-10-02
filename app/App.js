@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { Animated, View, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from './lib/supabase';
 import { emailAuthDeLogin, sairComRetry, ehPrivilegiado } from './lib/auth';
@@ -44,6 +44,7 @@ function AppInterno() {
   const [loginLogoBox, setLoginLogoBox] = useState(null);
   const [loginLogoVisivel, setLoginLogoVisivel] = useState(false);
   const [revelarFormLogin, setRevelarFormLogin] = useState(false);
+  const progressoVooLogin = useRef(new Animated.Value(0)).current;
   const [usuarioLogin, setUsuarioLogin] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -161,6 +162,7 @@ function AppInterno() {
           errorMsg={errorMsg}
           logoVisivel={!splashVisivel || loginLogoVisivel}
           revelarFormulario={!splashVisivel || revelarFormLogin}
+          progressoVoo={progressoVooLogin}
           onLogoMedida={setLoginLogoBox}
         />
       </>
@@ -273,6 +275,7 @@ function AppInterno() {
           sessaoPronta={sessaoCarregada}
           destinoLogin={sessaoCarregada && !session}
           loginLogoBox={loginLogoBox}
+          progressoVoo={progressoVooLogin}
           onRevelarFormulario={() => setRevelarFormLogin(true)}
           onLogoPousou={() => setLoginLogoVisivel(true)}
           onConcluir={() => setSplashVisivel(false)}

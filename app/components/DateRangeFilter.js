@@ -1,5 +1,6 @@
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTema } from '../lib/tema';
+import Icone from './ui/Icone';
 import {
   DIAS_SEMANA,
   PRESETS,
@@ -18,6 +19,10 @@ import {
   tituloMesAno,
 } from '../lib/dateRangeService';
 import { COR_MARCA } from '../lib/tema';
+
+function IconeCalendario({ cor }) {
+  return <Icone nome="calendar" tamanho={20} cor={cor} />;
+}
 
 function DayCell({ date, year, month, highlightStart, highlightEnd, onPress, corTexto }) {
   const noMes = mesmoMes(date, year, month);
@@ -58,9 +63,18 @@ function DayCell({ date, year, month, highlightStart, highlightEnd, onPress, cor
   );
 }
 
-export default function DateRangeFilter({ estado, onEstado, onPeriodoAplicado }) {
+export default function DateRangeFilter({
+  estado,
+  onEstado,
+  onPeriodoAplicado,
+  compacto = false,
+  contagemTexto,
+  direitaExtra,
+}) {
   const { cores } = useTema();
   const { titulo, subtitulo } = rotuloGatilho(estado.selectedPreset, estado.appliedRange);
+  const subtituloLinha = [subtitulo, contagemTexto].filter(Boolean).join(' · ');
+
 
   function atualizar(parcial) {
     onEstado((prev) => ({ ...prev, ...parcial }));
@@ -178,17 +192,44 @@ export default function DateRangeFilter({ estado, onEstado, onPeriodoAplicado })
 
   return (
     <>
-      <TouchableOpacity
-        style={[styles.gatilho, { borderColor: cores.borda, backgroundColor: cores.fundoSecundario }]}
-        onPress={abrirPresets}
-        activeOpacity={0.8}
-      >
-        <View>
-          <Text style={[styles.gatilhoTitulo, { color: cores.texto }]}>{titulo}</Text>
-          <Text style={[styles.gatilhoSubtitulo, { color: cores.textoSecundario }]}>{subtitulo}</Text>
+      {compacto ? (
+        <View style={[styles.gatilhoCompacto, { borderColor: cores.borda, backgroundColor: cores.fundoSecundario }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Período: ${titulo}. ${subtituloLinha || ''}`}
+            onPress={abrirPresets}
+            style={styles.gatilhoCompactoEsq}
+          >
+            <IconeCalendario cor={cores.primario} />
+            <View style={styles.gatilhoCompactoTextos}>
+              <View style={styles.gatilhoCompactoTituloRow}>
+                <Text style={[styles.gatilhoCompactoTitulo, { color: cores.texto }]} numberOfLines={1}>
+                  {titulo}
+                </Text>
+                <Text style={[styles.gatilhoSetaCompacta, { color: cores.textoSuave }]}>▾</Text>
+              </View>
+              {subtituloLinha ? (
+                <Text style={[styles.gatilhoCompactoSub, { color: cores.textoSecundario }]} numberOfLines={1}>
+                  {subtituloLinha}
+                </Text>
+              ) : null}
+            </View>
+          </Pressable>
+          {direitaExtra ? <View style={styles.gatilhoCompactoDir}>{direitaExtra}</View> : null}
         </View>
-        <Text style={[styles.gatilhoSeta, { color: cores.textoSecundario }]}>▾</Text>
-      </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={[styles.gatilho, { borderColor: cores.borda, backgroundColor: cores.fundoSecundario }]}
+          onPress={abrirPresets}
+          activeOpacity={0.8}
+        >
+          <View>
+            <Text style={[styles.gatilhoTitulo, { color: cores.texto }]}>{titulo}</Text>
+            <Text style={[styles.gatilhoSubtitulo, { color: cores.textoSecundario }]}>{subtitulo}</Text>
+          </View>
+          <Text style={[styles.gatilhoSeta, { color: cores.textoSecundario }]}>▾</Text>
+        </TouchableOpacity>
+      )}
 
       <Modal
         visible={estado.ui.presetMenuOpen}
@@ -299,6 +340,36 @@ const styles = StyleSheet.create({
   gatilhoTitulo: { fontSize: 18, fontWeight: 'bold', color: '#111' },
   gatilhoSubtitulo: { fontSize: 12, color: '#666', marginTop: 2 },
   gatilhoSeta: { fontSize: 18, color: '#666' },
+  gatilhoCompacto: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    minHeight: 56,
+    height: 56,
+    paddingLeft: 12,
+    paddingRight: 4,
+    overflow: 'hidden',
+  },
+  gatilhoCompactoEsq: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minHeight: 56,
+    paddingVertical: 8,
+    paddingRight: 8,
+  },
+  gatilhoCompactoTextos: { flex: 1, minWidth: 0 },
+  gatilhoCompactoTituloRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  gatilhoCompactoTitulo: { fontSize: 15, fontWeight: '700', letterSpacing: -0.2, flexShrink: 1 },
+  gatilhoSetaCompacta: { fontSize: 12, lineHeight: 16 },
+  gatilhoCompactoSub: { fontSize: 12, marginTop: 1 },
+  gatilhoCompactoDir: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',

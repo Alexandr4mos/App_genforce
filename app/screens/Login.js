@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  Easing,
   Image,
   Platform,
   StyleSheet,
@@ -20,6 +21,12 @@ const OVERLAY_RGB = '11,13,18';
 
 const GRADIENTE_WEB = `linear-gradient(180deg, rgba(${OVERLAY_RGB},${OVERLAY_TOP}) 0%, rgba(${OVERLAY_RGB},0.68) 42%, rgba(${OVERLAY_RGB},${OVERLAY_BOTTOM}) 100%)`;
 const GRADIENTE_FATIAS = 48;
+
+/** Alinhado à splash: campos a partir de ~60% do progress; ~200ms / gap ~50ms */
+const CAMPOS_INICIO = 0.6;
+const CAMPOS_DUR = 200 / 550;
+const CAMPOS_GAP = 50 / 550;
+const T_SOMBRA = 150;
 
 function opacidadeGradiente(t) {
   return OVERLAY_TOP + (OVERLAY_BOTTOM - OVERLAY_TOP) * t;
@@ -51,10 +58,28 @@ function OverlayGradiente() {
   );
 }
 
+function interpolarCampo(progresso, indice, tipo) {
+  const start = CAMPOS_INICIO + indice * CAMPOS_GAP;
+  const end = Math.min(1, start + CAMPOS_DUR);
+  if (tipo === 'opacidade') {
+    return progresso.interpolate({
+      inputRange: [0, start, end, 1],
+      outputRange: [0, 0, 1, 1],
+      extrapolate: 'clamp',
+    });
+  }
+  return progresso.interpolate({
+    inputRange: [0, start, end, 1],
+    outputRange: [12, 12, 0, 0],
+    extrapolate: 'clamp',
+  });
+}
+
 /**
- * @param {boolean} logoVisivel — controlado pela splash (opacity 0 até pousar)
- * @param {boolean} revelarFormulario — dispara fade-in escalonado dos campos
- * @param {(box:{x,y,width,height})=>void} onLogoMedida — measureInWindow da logo
+ * @param {boolean} logoVisivel — opacity 0 até a splash pousar
+ * @param {boolean} revelarFormulario — skip/fim: campos em 1
+ * @param {Animated.Value} [progressoVoo] — 0→1 da splash (sem setState na subida)
+ * @param {(box:{x,y,width,height})=>void} onLogoMedida
  */
 export default function Login({
   usuario,
@@ -66,10 +91,13 @@ export default function Login({
   errorMsg,
   logoVisivel = true,
   revelarFormulario = true,
+  progressoVoo,
   onLogoMedida,
 }) {
   const zoom = useRef(new Animated.Value(1.06)).current;
   const logoRef = useRef(null);
+  const sombraOp = useRef(new Animated.Value(0)).current;
+  const [sombraWeb, setSombraWeb] = useState(false);
   const usaDriver = Platform.OS !== 'web';
 
   const fadeUsuario = useRef(new Animated.Value(revelarFormulario ? 1 : 0)).current;
@@ -82,6 +110,22 @@ export default function Login({
   const slideAviso = useRef(new Animated.Value(revelarFormulario ? 0 : 12)).current;
 
   useEffect(() => {
+    try {
+      const uri = Image.resolveAssetSource?.(FOTO_CAPA)?.uri;
+      if (!uri) return;
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        const img = new window.Image();
+        img.src = uri;
+        img.decode?.().catch(() => {});
+      } else {
+        Image.prefetch(uri);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
     Animated.timing(zoom, {
       toValue: 1.14,
       duration: 16000,
@@ -89,22 +133,46 @@ export default function Login({
     }).start();
   }, [zoom, usaDriver]);
 
+  // Sombra só após o pouso (~150ms), sem filtro durante o voo da splash
+  useEffect(() => {
+    if (!logoVisivel) {
+      sombraOp.setValue(0);
+      setSombraWeb(false);
+      return;
+    }
+    if (Platform.OS === 'web') {
+      const t = setTimeout(() => setSombraWeb(true), 16);
+      return () => clearTimeout(t);
+    }
+    Animated.timing(sombraOp, {
+      toValue: 1,
+      duration: T_SOMBRA,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [logoVisivel, sombraOp]);
+
   useEffect(() => {
     if (!revelarFormulario) return;
-    const dur = 280;
-    const gap = 60;
-    const mk = (op, sl, delay) =>
-      Animated.parallel([
-        Animated.timing(op, { toValue: 1, duration: dur, delay, useNativeDriver: usaDriver }),
-        Animated.timing(sl, { toValue: 0, duration: dur, delay, useNativeDriver: usaDriver }),
-      ]);
-    Animated.parallel([
-      mk(fadeUsuario, slideUsuario, 0),
-      mk(fadeSenha, slideSenha, gap),
-      mk(fadeBotao, slideBotao, gap * 2),
-      mk(fadeAviso, slideAviso, gap * 3),
-    ]).start();
-  }, [revelarFormulario, usaDriver, fadeUsuario, fadeSenha, fadeBotao, fadeAviso, slideUsuario, slideSenha, slideBotao, slideAviso]);
+    fadeUsuario.setValue(1);
+    fadeSenha.setValue(1);
+    fadeBotao.setValue(1);
+    fadeAviso.setValue(1);
+    slideUsuario.setValue(0);
+    slideSenha.setValue(0);
+    slideBotao.setValue(0);
+    slideAviso.setValue(0);
+  }, [
+    revelarFormulario,
+    fadeUsuario,
+    fadeSenha,
+    fadeBotao,
+    fadeAviso,
+    slideUsuario,
+    slideSenha,
+    slideBotao,
+    slideAviso,
+  ]);
 
   function reportarMedida() {
     if (!onLogoMedida || !logoRef.current?.measureInWindow) return;
@@ -112,6 +180,17 @@ export default function Login({
       if (width > 0 && height > 0) onLogoMedida({ x, y, width, height });
     });
   }
+
+  const usarProgress = Boolean(progressoVoo);
+
+  const opUsuario = usarProgress ? interpolarCampo(progressoVoo, 0, 'opacidade') : fadeUsuario;
+  const opSenha = usarProgress ? interpolarCampo(progressoVoo, 1, 'opacidade') : fadeSenha;
+  const opBotao = usarProgress ? interpolarCampo(progressoVoo, 2, 'opacidade') : fadeBotao;
+  const opAviso = usarProgress ? interpolarCampo(progressoVoo, 3, 'opacidade') : fadeAviso;
+  const yUsuario = usarProgress ? interpolarCampo(progressoVoo, 0, 'slide') : slideUsuario;
+  const ySenha = usarProgress ? interpolarCampo(progressoVoo, 1, 'slide') : slideSenha;
+  const yBotao = usarProgress ? interpolarCampo(progressoVoo, 2, 'slide') : slideBotao;
+  const yAviso = usarProgress ? interpolarCampo(progressoVoo, 3, 'slide') : slideAviso;
 
   return (
     <View style={styles.tela}>
@@ -127,18 +206,45 @@ export default function Login({
 
       <View style={styles.conteudo}>
         <View style={styles.logoWrap}>
-          <Image
-            ref={logoRef}
-            collapsable={false}
-            source={LOGO}
-            style={[styles.logoImg, { opacity: logoVisivel ? 1 : 0 }]}
-            resizeMode="contain"
-            onLayout={reportarMedida}
-            onLoad={reportarMedida}
-          />
+          <Animated.View
+            style={
+              Platform.OS !== 'web'
+                ? {
+                    shadowColor: BRAND.fundo,
+                    shadowRadius: 14,
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: sombraOp.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 0.6],
+                    }),
+                  }
+                : null
+            }
+          >
+            <Image
+              ref={logoRef}
+              collapsable={false}
+              source={LOGO}
+              style={[
+                styles.logoImg,
+                { opacity: logoVisivel ? 1 : 0 },
+                Platform.OS === 'web'
+                  ? {
+                      // @ts-ignore web-only
+                      filter: sombraWeb ? 'drop-shadow(0 0 14px rgba(11,13,18,0.60))' : 'none',
+                      // @ts-ignore web-only
+                      transition: `filter ${T_SOMBRA}ms ease-out`,
+                    }
+                  : null,
+              ]}
+              resizeMode="contain"
+              onLayout={reportarMedida}
+              onLoad={reportarMedida}
+            />
+          </Animated.View>
         </View>
 
-        <Animated.View style={{ width: '100%', maxWidth: 420, opacity: fadeUsuario, transform: [{ translateY: slideUsuario }] }}>
+        <Animated.View style={{ width: '100%', maxWidth: 420, opacity: opUsuario, transform: [{ translateY: yUsuario }] }}>
           <TextInput
             style={styles.pilula}
             placeholder="Usuário"
@@ -149,7 +255,7 @@ export default function Login({
             onChangeText={onUsuario}
           />
         </Animated.View>
-        <Animated.View style={{ width: '100%', maxWidth: 420, opacity: fadeSenha, transform: [{ translateY: slideSenha }] }}>
+        <Animated.View style={{ width: '100%', maxWidth: 420, opacity: opSenha, transform: [{ translateY: ySenha }] }}>
           <TextInput
             style={styles.pilula}
             placeholder="Senha"
@@ -162,7 +268,7 @@ export default function Login({
 
         {errorMsg ? <Text style={styles.erro}>{errorMsg}</Text> : null}
 
-        <Animated.View style={{ width: '100%', maxWidth: 420, opacity: fadeBotao, transform: [{ translateY: slideBotao }] }}>
+        <Animated.View style={{ width: '100%', maxWidth: 420, opacity: opBotao, transform: [{ translateY: yBotao }] }}>
           <TouchableOpacity
             style={[styles.botaoEntrar, { backgroundColor: BRAND.destaque }]}
             onPress={onEntrar}
@@ -172,7 +278,7 @@ export default function Login({
           </TouchableOpacity>
         </Animated.View>
 
-        <Animated.View style={{ opacity: fadeAviso, transform: [{ translateY: slideAviso }] }}>
+        <Animated.View style={{ opacity: opAviso, transform: [{ translateY: yAviso }] }}>
           <Text style={styles.temaAviso}>Genforce Engenharia</Text>
         </Animated.View>
       </View>
@@ -220,14 +326,6 @@ const styles = StyleSheet.create({
   logoImg: {
     width: 244,
     height: 122,
-    ...(Platform.OS === 'web'
-      ? { filter: 'drop-shadow(0 0 14px rgba(11,13,18,0.60))' }
-      : {
-          shadowColor: BRAND.fundo,
-          shadowOpacity: 0.6,
-          shadowRadius: 14,
-          shadowOffset: { width: 0, height: 0 },
-        }),
   },
   pilula: {
     width: '100%',

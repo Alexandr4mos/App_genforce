@@ -14,22 +14,63 @@ import { BRAND } from '../lib/brand';
 
 const ICONE = require('../assets-login/genforce-app-icon-source.jpg');
 const LOGO = require('../assets-login/genforce-logo-manutencoes-branca.png');
+const FOTO_CAPA = require('../assets-login/foto-geradores-capa.jpg');
 
 const T_CRESCER = 400; // 0–0,4s
 const T_TROCA = 200; // 0,4–0,6s
-const T_HOLD = 150; // 0,6–0,75s
-const T_VOO = 600; // 0,75–1,35s
+const T_HOLD = 60; // ≤60ms parada após a troca
+const T_VOO = 550; // subida da logo
+const T_FUNDO = 450; // fade do fundo #0B0D12
 const T_FADE_FUNDO_APP = 350;
+
+/** cubic-bezier(0.22, 1, 0.36, 1) — sai rápido, desacelera no pouso */
+const EASE_VOO = Easing.bezier(0.22, 1, 0.36, 1);
+
+/** Campos começam quando a logo passou ~60% do caminho (progress) */
+const CAMPOS_INICIO = 0.6;
+const CAMPOS_DUR = 200 / T_VOO; // ~0,364 do progress
+const CAMPOS_GAP = 50 / T_VOO; // ~0,091
+
+async function garantirFotoLoginPronta() {
+  try {
+    const resolved = Image.resolveAssetSource?.(FOTO_CAPA);
+    const uri = resolved?.uri;
+    if (!uri) return;
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      await new Promise((resolve) => {
+        const img = new window.Image();
+        img.decoding = 'sync';
+        const done = () => resolve();
+        img.onerror = done;
+        img.onload = () => {
+          if (typeof img.decode === 'function') {
+            img.decode().then(done).catch(done);
+          } else {
+            done();
+          }
+        };
+        img.src = uri;
+      });
+      return;
+    }
+
+    await Image.prefetch(uri);
+  } catch {
+    // segue mesmo se o prefetch falhar
+  }
+}
 
 /**
  * Splash de abertura.
- * - destinoLogin: anima logo até a posição do Login e revela o formulário
+ * - destinoLogin: voo da logo (transform) até o Login + campos sincronizados
  * - !destinoLogin (app): fade da splash revelando o app (header intacto)
  */
 export default function SplashAbertura({
   sessaoPronta,
   destinoLogin,
   loginLogoBox,
+  progressoVoo,
   onRevelarFormulario,
   onLogoPousou,
   onConcluir,
@@ -37,24 +78,27 @@ export default function SplashAbertura({
   const { width: W, height: H } = useWindowDimensions();
   const [reduzirMovimento, setReduzirMovimento] = useState(null);
   const [modoEspera, setModoEspera] = useState(false);
-  const [faseVoo, setFaseVoo] = useState(false);
+  /** Destino do voo (uma re-render só no início da subida) */
+  const [vooDestino, setVooDestino] = useState(null);
+
   const concluiuRef = useRef(false);
   const passo2FeitoRef = useRef(false);
+  const emVooRef = useRef(false);
   const sessaoRef = useRef(sessaoPronta);
   const destinoRef = useRef(destinoLogin);
   const boxRef = useRef(loginLogoBox);
   const pulsoLoopRef = useRef(null);
   const timersRef = useRef([]);
+  const fotoProntaRef = useRef(null);
+
+  const progressInterno = useRef(new Animated.Value(0)).current;
+  const progress = progressoVoo || progressInterno;
 
   const opacidadeFundo = useRef(new Animated.Value(1)).current;
   const escalaIcone = useRef(new Animated.Value(0.4)).current;
   const opacidadeIcone = useRef(new Animated.Value(1)).current;
   const opacidadeLogo = useRef(new Animated.Value(0)).current;
   const escalaLogo = useRef(new Animated.Value(0.95)).current;
-  const logoLeft = useRef(new Animated.Value(0)).current;
-  const logoTop = useRef(new Animated.Value(0)).current;
-  const logoW = useRef(new Animated.Value(0)).current;
-  const logoH = useRef(new Animated.Value(0)).current;
   const brilho = useRef(new Animated.Value(0)).current;
 
   const usaDriver = Platform.OS !== 'web';
@@ -69,11 +113,7 @@ export default function SplashAbertura({
     if (typeof document !== 'undefined') {
       document.getElementById('splash-boot')?.remove();
     }
-    // Posição inicial da logo (centro)
-    logoLeft.setValue(logoCentroLeft);
-    logoTop.setValue(logoCentroTop);
-    logoW.setValue(logoCentroW);
-    logoH.setValue(logoCentroH);
+    fotoProntaRef.current = garantirFotoLoginPronta();
   }, []);
 
   useEffect(() => {
@@ -81,16 +121,14 @@ export default function SplashAbertura({
     destinoRef.current = destinoLogin;
     boxRef.current = loginLogoBox;
     if (passo2FeitoRef.current && sessaoPronta && modoEspera) {
-      // Saiu da espera: segue do passo 2
       setModoEspera(false);
       pararPulso();
       brilho.setValue(0);
       iniciarPasso2();
-    } else if (passo2FeitoRef.current && sessaoPronta && !modoEspera && !faseVoo) {
-      // Já estávamos no hold aguardando box/sessão
+    } else if (passo2FeitoRef.current && sessaoPronta && !modoEspera && !emVooRef.current) {
       tentarPasso4();
     }
-  }, [sessaoPronta, destinoLogin, loginLogoBox, modoEspera, faseVoo]);
+  }, [sessaoPronta, destinoLogin, loginLogoBox, modoEspera]);
 
   useEffect(() => {
     let ativo = true;
@@ -156,16 +194,17 @@ export default function SplashAbertura({
     opacidadeIcone.stopAnimation();
     opacidadeLogo.stopAnimation();
     opacidadeFundo.stopAnimation();
+    progress.stopAnimation();
+    progress.setValue(1);
+    opacidadeFundo.setValue(0);
     onLogoPousou?.();
     onRevelarFormulario?.();
     opacidadeIcone.setValue(0);
     opacidadeLogo.setValue(0);
-    opacidadeFundo.setValue(0);
     finalizar();
   }
 
   function fadeSplashApp() {
-    // Logado: some logo da splash e o fundo
     Animated.parallel([
       Animated.timing(opacidadeLogo, { toValue: 0, duration: 180, useNativeDriver: usaDriver }),
       Animated.timing(opacidadeFundo, { toValue: 0, duration: T_FADE_FUNDO_APP, useNativeDriver: usaDriver }),
@@ -175,7 +214,6 @@ export default function SplashAbertura({
   }
 
   function iniciarPasso2() {
-    // G some, logo aparece (nunca juntos)
     Animated.timing(opacidadeIcone, {
       toValue: 0,
       duration: T_TROCA / 2,
@@ -193,8 +231,8 @@ export default function SplashAbertura({
     });
   }
 
-  function tentarPasso4() {
-    if (concluiuRef.current || faseVoo) return;
+  async function tentarPasso4() {
+    if (concluiuRef.current || emVooRef.current) return;
     if (!sessaoRef.current) return;
 
     if (!destinoRef.current) {
@@ -203,29 +241,38 @@ export default function SplashAbertura({
     }
 
     const box = boxRef.current;
-    if (!box || box.width <= 0) {
-      // Espera onLayout do Login
-      return;
-    }
+    if (!box || box.width <= 0) return;
 
-    setFaseVoo(true);
-    onRevelarFormulario?.();
+    emVooRef.current = true;
 
-    // Voo da logo + fade do fundo
-    Animated.parallel([
-      Animated.timing(logoLeft, { toValue: box.x, duration: T_VOO, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }),
-      Animated.timing(logoTop, { toValue: box.y, duration: T_VOO, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }),
-      Animated.timing(logoW, { toValue: box.width, duration: T_VOO, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }),
-      Animated.timing(logoH, { toValue: box.height, duration: T_VOO, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }),
-      Animated.timing(opacidadeFundo, {
-        toValue: 0,
-        duration: T_VOO,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: false,
-      }),
-    ]).start(({ finished }) => {
+    await (fotoProntaRef.current || garantirFotoLoginPronta());
+    if (concluiuRef.current) return;
+
+    const startCx = logoCentroLeft + logoCentroW / 2;
+    const startCy = logoCentroTop + logoCentroH / 2;
+    const endCx = box.x + box.width / 2;
+    const endCy = box.y + box.height / 2;
+    const scaleFinal = box.width / logoCentroW;
+
+    // Uma re-render liga transforms ao progress; o timing roda no effect abaixo
+    progress.setValue(0);
+    setVooDestino({
+      tx: endCx - startCx,
+      ty: endCy - startCy,
+      scale: scaleFinal,
+    });
+  }
+
+  useEffect(() => {
+    if (!vooDestino || concluiuRef.current) return;
+
+    Animated.timing(progress, {
+      toValue: 1,
+      duration: T_VOO,
+      easing: EASE_VOO,
+      useNativeDriver: false,
+    }).start(({ finished }) => {
       if (!finished || concluiuRef.current) return;
-      // Login logo no mesmo lugar; splash some no frame seguinte (sem gap vazio)
       onLogoPousou?.();
       requestAnimationFrame(() => {
         if (concluiuRef.current) return;
@@ -233,7 +280,8 @@ export default function SplashAbertura({
         finalizar();
       });
     });
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vooDestino]);
 
   useEffect(() => {
     if (reduzirMovimento === null) return;
@@ -242,7 +290,6 @@ export default function SplashAbertura({
       return;
     }
 
-    // 1) G vem de longe (scale 0,4 → 1), tamanho final ~30% largura — sem glow
     Animated.timing(escalaIcone, {
       toValue: 1,
       duration: T_CRESCER,
@@ -252,7 +299,6 @@ export default function SplashAbertura({
       if (!finished || concluiuRef.current) return;
 
       if (!sessaoRef.current) {
-        // Espera sessão com G + glow sutil
         setModoEspera(true);
         iniciarPulso();
         return;
@@ -267,6 +313,15 @@ export default function SplashAbertura({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reduzirMovimento]);
 
+  // Fundo: some nos primeiros T_FUNDO ms do progress (sincronizado com o início da subida)
+  const opacidadeFundoVoo = vooDestino
+    ? progress.interpolate({
+        inputRange: [0, T_FUNDO / T_VOO],
+        outputRange: [1, 0],
+        extrapolate: 'clamp',
+      })
+    : opacidadeFundo;
+
   const glowStyle = Platform.select({
     web: { boxShadow: `0 0 22px 2px ${BRAND.destaque}` },
     default: {
@@ -277,11 +332,34 @@ export default function SplashAbertura({
     },
   });
 
+  const logoTransform = vooDestino
+    ? [
+        {
+          translateX: progress.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, vooDestino.tx],
+          }),
+        },
+        {
+          translateY: progress.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, vooDestino.ty],
+          }),
+        },
+        {
+          scale: progress.interpolate({
+            inputRange: [0, 1],
+            outputRange: [1, vooDestino.scale],
+          }),
+        },
+      ]
+    : [{ scale: escalaLogo }];
+
   return (
     <View style={styles.overlay} pointerEvents="box-none">
       <Animated.View
         pointerEvents="none"
-        style={[StyleSheet.absoluteFill, { backgroundColor: BRAND.fundo, opacity: opacidadeFundo }]}
+        style={[StyleSheet.absoluteFill, { backgroundColor: BRAND.fundo, opacity: opacidadeFundoVoo }]}
       />
       <Pressable
         style={StyleSheet.absoluteFill}
@@ -330,17 +408,20 @@ export default function SplashAbertura({
         </Animated.View>
 
         <Animated.View
-          style={{
-            position: 'absolute',
-            left: logoLeft,
-            top: logoTop,
-            width: logoW,
-            height: logoH,
-            opacity: opacidadeLogo,
-            transform: faseVoo ? [] : [{ scale: escalaLogo }],
-          }}
+          style={[
+            {
+              position: 'absolute',
+              left: logoCentroLeft,
+              top: logoCentroTop,
+              width: logoCentroW,
+              height: logoCentroH,
+              opacity: opacidadeLogo,
+              transform: logoTransform,
+            },
+            Platform.OS === 'web' ? styles.logoWillChange : null,
+          ]}
         >
-          <Image source={LOGO} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+          <Image source={LOGO} style={styles.logoImg} resizeMode="contain" />
         </Animated.View>
       </View>
     </View>
@@ -357,5 +438,14 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  logoImg: {
+    width: '100%',
+    height: '100%',
+    // sem drop-shadow/filter durante o voo
+  },
+  logoWillChange: {
+    // @ts-ignore web-only
+    willChange: 'transform, opacity',
   },
 });
