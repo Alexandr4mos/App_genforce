@@ -16,12 +16,18 @@ const ICONE = require('../assets-login/genforce-app-icon-source.jpg');
 const LOGO = require('../assets-login/genforce-logo-manutencoes-branca.png');
 const FOTO_CAPA = require('../assets-login/foto-geradores-capa.jpg');
 
-const T_CRESCER = 400; // 0–0,4s
-const T_TROCA = 200; // 0,4–0,6s
+/** Fração da largura = tamanho do ícone do sistema / #splash-boot (sem salto) */
+const ICONE_FRAC = 0.18;
+const ESCALA_G_FIM = 1.08;
+
+const T_G = 250; // G visível / cresce 1 → 1,08
+const T_TROCA = 200; // G → logo (só deslogado)
 const T_HOLD = 60; // ≤60ms parada após a troca
 const T_VOO = 550; // subida da logo
-const T_FUNDO = 450; // fade do fundo #0B0D12
-const T_FADE_FUNDO_APP = 350;
+const T_FUNDO = 450; // fade do fundo #0B0D12 no voo
+const T_FADE_APP = 280; // G + fundo → app (logado)
+const T_FADE_FUNDO_APP = 350; // fallback fade fundo
+
 
 /** cubic-bezier(0.22, 1, 0.36, 1) — sai rápido, desacelera no pouso */
 const EASE_VOO = Easing.bezier(0.22, 1, 0.36, 1);
@@ -95,15 +101,16 @@ export default function SplashAbertura({
   const progress = progressoVoo || progressInterno;
 
   const opacidadeFundo = useRef(new Animated.Value(1)).current;
-  const escalaIcone = useRef(new Animated.Value(0.4)).current;
+  const escalaIcone = useRef(new Animated.Value(1)).current; // começa no tamanho do splash do sistema
   const opacidadeIcone = useRef(new Animated.Value(1)).current;
   const opacidadeLogo = useRef(new Animated.Value(0)).current;
   const escalaLogo = useRef(new Animated.Value(0.95)).current;
   const brilho = useRef(new Animated.Value(0)).current;
 
   const usaDriver = Platform.OS !== 'web';
-  const iconeFinal = Math.max(96, Math.round(W * 0.3));
-  const raioIcone = iconeFinal * 0.22;
+  // Mesmo tamanho do #splash-boot / ícone do sistema (~18% da largura)
+  const iconeBase = Math.max(72, Math.min(140, Math.round(W * ICONE_FRAC)));
+  const raioIcone = iconeBase * 0.22;
   const logoCentroW = Math.min(W * 0.6, 420);
   const logoCentroH = logoCentroW / 2;
   const logoCentroLeft = (W - logoCentroW) / 2;
@@ -120,12 +127,21 @@ export default function SplashAbertura({
     sessaoRef.current = sessaoPronta;
     destinoRef.current = destinoLogin;
     boxRef.current = loginLogoBox;
-    if (passo2FeitoRef.current && sessaoPronta && modoEspera) {
+
+    // Saiu da espera de sessão: logado → app direto; deslogado → logo
+    if (modoEspera && sessaoPronta) {
       setModoEspera(false);
       pararPulso();
       brilho.setValue(0);
-      iniciarPasso2();
-    } else if (passo2FeitoRef.current && sessaoPronta && !modoEspera && !emVooRef.current) {
+      if (destinoLogin) {
+        iniciarPasso2();
+      } else {
+        fadeAppComG();
+      }
+      return;
+    }
+
+    if (passo2FeitoRef.current && sessaoPronta && !modoEspera && !emVooRef.current) {
       tentarPasso4();
     }
   }, [sessaoPronta, destinoLogin, loginLogoBox, modoEspera]);
@@ -207,7 +223,28 @@ export default function SplashAbertura({
   function fadeSplashApp() {
     Animated.parallel([
       Animated.timing(opacidadeLogo, { toValue: 0, duration: 180, useNativeDriver: usaDriver }),
+      Animated.timing(opacidadeIcone, { toValue: 0, duration: 180, useNativeDriver: usaDriver }),
       Animated.timing(opacidadeFundo, { toValue: 0, duration: T_FADE_FUNDO_APP, useNativeDriver: usaDriver }),
+    ]).start(({ finished }) => {
+      if (finished) finalizar();
+    });
+  }
+
+  /** Logado: G some e o app aparece — sem logo MANUTENÇÕES */
+  function fadeAppComG() {
+    Animated.parallel([
+      Animated.timing(opacidadeIcone, {
+        toValue: 0,
+        duration: T_FADE_APP,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: usaDriver,
+      }),
+      Animated.timing(opacidadeFundo, {
+        toValue: 0,
+        duration: T_FADE_APP,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: usaDriver,
+      }),
     ]).start(({ finished }) => {
       if (finished) finalizar();
     });
@@ -290,9 +327,10 @@ export default function SplashAbertura({
       return;
     }
 
+    // G já no tamanho do sistema; só cresce levemente 1 → 1,08 (sem fade)
     Animated.timing(escalaIcone, {
-      toValue: 1,
-      duration: T_CRESCER,
+      toValue: ESCALA_G_FIM,
+      duration: T_G,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: usaDriver,
     }).start(({ finished }) => {
@@ -303,6 +341,14 @@ export default function SplashAbertura({
         iniciarPulso();
         return;
       }
+
+      // Já logado: app direto, sem logo
+      if (!destinoRef.current) {
+        fadeAppComG();
+        return;
+      }
+
+      // Deslogado: troca G → logo e sobe pro login
       iniciarPasso2();
     });
 
@@ -373,8 +419,8 @@ export default function SplashAbertura({
           style={{
             opacity: opacidadeIcone,
             transform: [{ scale: escalaIcone }],
-            width: iconeFinal,
-            height: iconeFinal,
+            width: iconeBase,
+            height: iconeBase,
             alignItems: 'center',
             justifyContent: 'center',
           }}
@@ -384,8 +430,8 @@ export default function SplashAbertura({
               style={[
                 {
                   position: 'absolute',
-                  width: iconeFinal,
-                  height: iconeFinal,
+                  width: iconeBase,
+                  height: iconeBase,
                   borderRadius: raioIcone,
                   backgroundColor: 'transparent',
                   opacity: brilho,
@@ -397,8 +443,8 @@ export default function SplashAbertura({
           <Image
             source={ICONE}
             style={{
-              width: iconeFinal,
-              height: iconeFinal,
+              width: iconeBase,
+              height: iconeBase,
               borderRadius: raioIcone,
               overflow: 'hidden',
               backgroundColor: BRAND.fundo,
