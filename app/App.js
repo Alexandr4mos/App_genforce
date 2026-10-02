@@ -130,12 +130,22 @@ function AppInterno() {
 
   async function handleLogout() {
     await sairComRetry(supabase.auth);
+    // Limpa estado da conta anterior para o próximo login
+    setUsuarioLogin('');
+    setPassword('');
+    setErrorMsg('');
+    setLoading(false);
     setOsSelecionadaId(null);
     setCriandoOS(false);
     setOsEditandoId(null);
     setOsRemanejandoId(null);
     setSecao('os');
+    setPapel(null);
     resetFiltros();
+    // Splash já rodou: Login pós-logout fica completo na hora
+    setLoginLogoVisivel(true);
+    setRevelarFormLogin(true);
+    progressoVooLogin.setValue(1);
   }
 
   /** Tela inicial = lista de OS (não é “voltar” do histórico). */
@@ -153,6 +163,7 @@ function AppInterno() {
       <>
         <StatusBar style="light" />
         <Login
+          key="login"
           usuario={usuarioLogin}
           password={password}
           onUsuario={setUsuarioLogin}
@@ -161,8 +172,8 @@ function AppInterno() {
           loading={loading}
           errorMsg={errorMsg}
           logoVisivel={!splashVisivel || loginLogoVisivel}
-          revelarFormulario={!splashVisivel || revelarFormLogin}
-          progressoVoo={progressoVooLogin}
+          animarComSplash={splashVisivel && !revelarFormLogin}
+          progressoVoo={splashVisivel ? progressoVooLogin : null}
           onLogoMedida={setLoginLogoBox}
         />
       </>
@@ -241,6 +252,7 @@ function AppInterno() {
       } else {
         conteudo = (
           <ListaOS
+            key={session.user.id}
             userId={session.user.id}
             onAbrirOS={setOsSelecionadaId}
             onCriarOS={() => setCriandoOS(true)}
@@ -278,7 +290,13 @@ function AppInterno() {
           progressoVoo={progressoVooLogin}
           onRevelarFormulario={() => setRevelarFormLogin(true)}
           onLogoPousou={() => setLoginLogoVisivel(true)}
-          onConcluir={() => setSplashVisivel(false)}
+          onConcluir={() => {
+            // Todo caminho de saída da splash deixa o Login utilizável
+            setSplashVisivel(false);
+            setLoginLogoVisivel(true);
+            setRevelarFormLogin(true);
+            progressoVooLogin.setValue(1);
+          }}
         />
       ) : null}
     </View>

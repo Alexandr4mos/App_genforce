@@ -16,8 +16,8 @@ const ICONE = require('../assets-login/genforce-app-icon-source.jpg');
 const LOGO = require('../assets-login/genforce-logo-manutencoes-branca.png');
 const FOTO_CAPA = require('../assets-login/foto-geradores-capa.jpg');
 
-/** Fração da largura = tamanho do ícone do sistema / #splash-boot (sem salto) */
-const ICONE_FRAC = 0.18;
+/** Tamanho fixo do G — igual no #splash-boot e na splash React (sem salto) */
+const ICONE_PX = 150;
 const ESCALA_G_FIM = 1.08;
 
 const T_G = 250; // G visível / cresce 1 → 1,08
@@ -96,6 +96,7 @@ export default function SplashAbertura({
   const pulsoLoopRef = useRef(null);
   const timersRef = useRef([]);
   const fotoProntaRef = useRef(null);
+  const bootRemovidoRef = useRef(false);
 
   const progressInterno = useRef(new Animated.Value(0)).current;
   const progress = progressoVoo || progressInterno;
@@ -108,19 +109,47 @@ export default function SplashAbertura({
   const brilho = useRef(new Animated.Value(0)).current;
 
   const usaDriver = Platform.OS !== 'web';
-  // Mesmo tamanho do #splash-boot / ícone do sistema (~18% da largura)
-  const iconeBase = Math.max(72, Math.min(140, Math.round(W * ICONE_FRAC)));
+  // Mesmo tamanho fixo do #splash-boot (150px)
+  const iconeBase = ICONE_PX;
   const raioIcone = iconeBase * 0.22;
   const logoCentroW = Math.min(W * 0.6, 420);
   const logoCentroH = logoCentroW / 2;
   const logoCentroLeft = (W - logoCentroW) / 2;
   const logoCentroTop = (H - logoCentroH) / 2;
 
-  useEffect(() => {
+  function removerSplashBoot() {
+    if (bootRemovidoRef.current) return;
+    bootRemovidoRef.current = true;
     if (typeof document !== 'undefined') {
       document.getElementById('splash-boot')?.remove();
     }
+  }
+
+  useEffect(() => {
     fotoProntaRef.current = garantirFotoLoginPronta();
+    // Timeout de segurança: se a splash travar, libera o Login/app
+    agendar(() => {
+      if (!concluiuRef.current) pular();
+    }, 8000);
+
+    // Fallback: remove o boot após o G React ter chance de pintar
+    let id1 = 0;
+    let id2 = 0;
+    if (typeof requestAnimationFrame === 'function') {
+      id1 = requestAnimationFrame(() => {
+        id2 = requestAnimationFrame(removerSplashBoot);
+      });
+    } else {
+      agendar(removerSplashBoot, 32);
+    }
+
+    return () => {
+      if (typeof cancelAnimationFrame === 'function') {
+        cancelAnimationFrame(id1);
+        cancelAnimationFrame(id2);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -183,6 +212,14 @@ export default function SplashAbertura({
     concluiuRef.current = true;
     limparTimers();
     pararPulso();
+    // Garante Login utilizável em qualquer saída (incl. logado / erro)
+    try {
+      progress.setValue(1);
+    } catch {
+      /* ignore */
+    }
+    onLogoPousou?.();
+    onRevelarFormulario?.();
     onConcluir?.();
   }
 
@@ -213,8 +250,6 @@ export default function SplashAbertura({
     progress.stopAnimation();
     progress.setValue(1);
     opacidadeFundo.setValue(0);
-    onLogoPousou?.();
-    onRevelarFormulario?.();
     opacidadeIcone.setValue(0);
     opacidadeLogo.setValue(0);
     finalizar();
@@ -226,7 +261,8 @@ export default function SplashAbertura({
       Animated.timing(opacidadeIcone, { toValue: 0, duration: 180, useNativeDriver: usaDriver }),
       Animated.timing(opacidadeFundo, { toValue: 0, duration: T_FADE_FUNDO_APP, useNativeDriver: usaDriver }),
     ]).start(({ finished }) => {
-      if (finished) finalizar();
+      if (!finished || concluiuRef.current) return;
+      finalizar();
     });
   }
 
@@ -246,7 +282,8 @@ export default function SplashAbertura({
         useNativeDriver: usaDriver,
       }),
     ]).start(({ finished }) => {
-      if (finished) finalizar();
+      if (!finished || concluiuRef.current) return;
+      finalizar();
     });
   }
 
@@ -450,6 +487,8 @@ export default function SplashAbertura({
               backgroundColor: BRAND.fundo,
             }}
             resizeMode="cover"
+            onLoad={removerSplashBoot}
+            onLayout={removerSplashBoot}
           />
         </Animated.View>
 

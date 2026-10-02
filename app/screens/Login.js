@@ -76,9 +76,9 @@ function interpolarCampo(progresso, indice, tipo) {
 }
 
 /**
- * @param {boolean} logoVisivel — opacity 0 até a splash pousar
- * @param {boolean} revelarFormulario — skip/fim: campos em 1
- * @param {Animated.Value} [progressoVoo] — 0→1 da splash (sem setState na subida)
+ * @param {boolean} logoVisivel — false só durante a splash (antes do pouso)
+ * @param {boolean} animarComSplash — true só enquanto a splash deslogada anima os campos via progressoVoo
+ * @param {Animated.Value} [progressoVoo] — 0→1 da splash (ignorado se !animarComSplash)
  * @param {(box:{x,y,width,height})=>void} onLogoMedida
  */
 export default function Login({
@@ -90,24 +90,19 @@ export default function Login({
   loading,
   errorMsg,
   logoVisivel = true,
-  revelarFormulario = true,
+  animarComSplash = false,
   progressoVoo,
   onLogoMedida,
 }) {
   const zoom = useRef(new Animated.Value(1.06)).current;
   const logoRef = useRef(null);
-  const sombraOp = useRef(new Animated.Value(0)).current;
-  const [sombraWeb, setSombraWeb] = useState(false);
+  const sombraOp = useRef(new Animated.Value(logoVisivel ? 1 : 0)).current;
+  const [sombraWeb, setSombraWeb] = useState(Boolean(logoVisivel));
   const usaDriver = Platform.OS !== 'web';
 
-  const fadeUsuario = useRef(new Animated.Value(revelarFormulario ? 1 : 0)).current;
-  const fadeSenha = useRef(new Animated.Value(revelarFormulario ? 1 : 0)).current;
-  const fadeBotao = useRef(new Animated.Value(revelarFormulario ? 1 : 0)).current;
-  const fadeAviso = useRef(new Animated.Value(revelarFormulario ? 1 : 0)).current;
-  const slideUsuario = useRef(new Animated.Value(revelarFormulario ? 0 : 12)).current;
-  const slideSenha = useRef(new Animated.Value(revelarFormulario ? 0 : 12)).current;
-  const slideBotao = useRef(new Animated.Value(revelarFormulario ? 0 : 12)).current;
-  const slideAviso = useRef(new Animated.Value(revelarFormulario ? 0 : 12)).current;
+  // Padrão: tudo visível. Só esconde quando a splash deslogada está ativa.
+  const formOp = useRef(new Animated.Value(animarComSplash ? 0 : 1)).current;
+  const formY = useRef(new Animated.Value(animarComSplash ? 12 : 0)).current;
 
   useEffect(() => {
     try {
@@ -133,7 +128,7 @@ export default function Login({
     }).start();
   }, [zoom, usaDriver]);
 
-  // Sombra só após o pouso (~150ms), sem filtro durante o voo da splash
+  // Sombra da logo: só após pouso / quando já visível (ex.: pós-logout)
   useEffect(() => {
     if (!logoVisivel) {
       sombraOp.setValue(0);
@@ -152,27 +147,16 @@ export default function Login({
     }).start();
   }, [logoVisivel, sombraOp]);
 
+  // Sem splash: formulário visível na hora (logout / splash já terminou)
   useEffect(() => {
-    if (!revelarFormulario) return;
-    fadeUsuario.setValue(1);
-    fadeSenha.setValue(1);
-    fadeBotao.setValue(1);
-    fadeAviso.setValue(1);
-    slideUsuario.setValue(0);
-    slideSenha.setValue(0);
-    slideBotao.setValue(0);
-    slideAviso.setValue(0);
-  }, [
-    revelarFormulario,
-    fadeUsuario,
-    fadeSenha,
-    fadeBotao,
-    fadeAviso,
-    slideUsuario,
-    slideSenha,
-    slideBotao,
-    slideAviso,
-  ]);
+    if (animarComSplash) {
+      formOp.setValue(0);
+      formY.setValue(12);
+      return;
+    }
+    formOp.setValue(1);
+    formY.setValue(0);
+  }, [animarComSplash, formOp, formY]);
 
   function reportarMedida() {
     if (!onLogoMedida || !logoRef.current?.measureInWindow) return;
@@ -181,16 +165,16 @@ export default function Login({
     });
   }
 
-  const usarProgress = Boolean(progressoVoo);
+  const usarProgress = Boolean(animarComSplash && progressoVoo);
 
-  const opUsuario = usarProgress ? interpolarCampo(progressoVoo, 0, 'opacidade') : fadeUsuario;
-  const opSenha = usarProgress ? interpolarCampo(progressoVoo, 1, 'opacidade') : fadeSenha;
-  const opBotao = usarProgress ? interpolarCampo(progressoVoo, 2, 'opacidade') : fadeBotao;
-  const opAviso = usarProgress ? interpolarCampo(progressoVoo, 3, 'opacidade') : fadeAviso;
-  const yUsuario = usarProgress ? interpolarCampo(progressoVoo, 0, 'slide') : slideUsuario;
-  const ySenha = usarProgress ? interpolarCampo(progressoVoo, 1, 'slide') : slideSenha;
-  const yBotao = usarProgress ? interpolarCampo(progressoVoo, 2, 'slide') : slideBotao;
-  const yAviso = usarProgress ? interpolarCampo(progressoVoo, 3, 'slide') : slideAviso;
+  const opUsuario = usarProgress ? interpolarCampo(progressoVoo, 0, 'opacidade') : formOp;
+  const opSenha = usarProgress ? interpolarCampo(progressoVoo, 1, 'opacidade') : formOp;
+  const opBotao = usarProgress ? interpolarCampo(progressoVoo, 2, 'opacidade') : formOp;
+  const opAviso = usarProgress ? interpolarCampo(progressoVoo, 3, 'opacidade') : formOp;
+  const yUsuario = usarProgress ? interpolarCampo(progressoVoo, 0, 'slide') : formY;
+  const ySenha = usarProgress ? interpolarCampo(progressoVoo, 1, 'slide') : formY;
+  const yBotao = usarProgress ? interpolarCampo(progressoVoo, 2, 'slide') : formY;
+  const yAviso = usarProgress ? interpolarCampo(progressoVoo, 3, 'slide') : formY;
 
   return (
     <View style={styles.tela}>
